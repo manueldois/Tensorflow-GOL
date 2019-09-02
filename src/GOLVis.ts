@@ -1,26 +1,22 @@
 import { ISize, IVector, ITransform, IRect, IVisibleSquare } from './interfaces'
 import * as tf from '@tensorflow/tfjs-core'
 import panzoom, { PanZoom } from 'panzoom'
-import { encode } from 'fast-png'
+import { encode as PNGencoder } from 'fast-png'
 import { printVectors } from './util'
 import * as rxjs from 'rxjs'
 
-/** Provides rendering, panning, and zooming for GOL  */
+/** Provides rendering, panning, and zooming for GOL.
+ * @description
+ * VIEWPORT contains BOARD contains IMG.
+ * VIEWPORT can be any size in DOM. BOARD and IMG have their DOM size controlled by this class. 
+ * BOARD floats in VIEWPORT, and has it's zoom and position controlled by panzoom.
+ * In the DOM, 1px = 1cell. Zooming is achieved by using the view layer (css tranform)
+*/
 export default class GOLVis {
-    constructor() {
-        const VIEWPORT_EL = document.getElementById('viewport')
-        const BOARD_EL = document.getElementById('board')
-        const IMG_EL = document.getElementById('world')
-        // const GRID_EL = document.getElementById('grid')
+    constructor(public VIEWPORT_EL: HTMLElement, public BOARD_EL: HTMLElement, public IMG_EL: HTMLImageElement) {
         if (!VIEWPORT_EL) throw new Error('Got no viewport element')
         if (!BOARD_EL) throw new Error('Got no board element')
         if (!IMG_EL) throw new Error('Got no image element')
-        // if (!GRID_EL) throw new Error('Got no grid element')
-
-        this.VIEWPORT_EL = VIEWPORT_EL
-        this.BOARD_EL = BOARD_EL
-        this.IMG_EL = <HTMLImageElement>IMG_EL
-        // this.GRID_EL = <HTMLCanvasElement>GRID_EL
 
         this.PANZOOM = panzoom(this.BOARD_EL)
 
@@ -28,42 +24,38 @@ export default class GOLVis {
         this.attachEventListeners()
     }
 
-    // VIEWPORT contains BOARD contains IMG
-    // 1 cell = 1 px in IMG.
-    // Zoom and pan is controlled by panzoom library, using transform: translate and scale 
-
     // A ref to the WORLD used thought the app
     WORLD: tf.Variable<tf.Rank.R2> | null = null
     WORLD_SIZE: number | null = null
     // Viewport has just height and width from DOM, in px
     // Changes on window resize
     VIEWPORT: ISize = {} as ISize
-    VIEWPORT_EL: HTMLElement
     // Board floats in Viewport using panzoom. Includes zoom. in px
     // Changes on pan or zoom
     BOARD: IRect = {} as IRect
-    BOARD_EL: HTMLElement
     // IMG is where the WORLD is rendered,
     // It's offset from the board to make rendering only part of the grid possible
     IMG: IRect = {} as IRect
-    IMG_EL: HTMLImageElement
-    IMG_LOAD: rxjs.Observable<Event> | null = null
-    // GRID is the canvas grid above the image, just to render the grid lines (fixed)
-    // GRID_EL: HTMLCanvasElement
-    // VISIBLE_SQUARE stores the coordenates of the part of the world that is visible by the user
-    // Changes when BOARD or VIEWPORT change
+    IMG_LOAD_EVENT: rxjs.Observable<Event> | null = null
+
+    /** VISIBLE_SQUARE stores the coordenates of the part of the world that is visible by the user,
+     *  changes when BOARD or VIEWPORT change
+    */
     VISIBLE_SQUARE: IVisibleSquare = {} as IVisibleSquare
 
+    /** Panzoom instance. Panzoom is a library that provides pan and zoom to a DOM element.
+     *  here used to pan and zoom the BOARD
+     */
     PANZOOM: PanZoom
+
+    /** Stores the same scale as Panzoom */
     SCALE = 1
 
-    LOG: any = {}
-
-
+    /** Binds a WORLD variable to the instance */
     useWorld(WORLD: tf.Variable<tf.Rank.R2>) {
         const WORLD_SIZE = WORLD.shape[0]
-        if (WORLD_SIZE < 0) throw new Error('WORLD_SIZE must be greater than zero')
-        if (WORLD_SIZE % 1 !== 0) throw new Error('WORLD_SIZE must be an integer')
+        if (WORLD_SIZE < 0) throw new Error('WORLD size must be greater than zero')
+        if (WORLD_SIZE % 1 !== 0) throw new Error('WORLD size must be an integer')
 
         this.WORLD_SIZE = WORLD_SIZE
         this.WORLD = WORLD
@@ -74,7 +66,7 @@ export default class GOLVis {
     attachEventListeners() {
         window.addEventListener('resize', () => { this.updateViewport() })
 
-        this.IMG_LOAD = rxjs.fromEvent(this.IMG_EL, 'load')
+        this.IMG_LOAD_EVENT = rxjs.fromEvent(this.IMG_EL, 'load')
 
         this.PANZOOM.on('panend', (e: any) => {
             this.updateBoard()
@@ -197,60 +189,50 @@ export default class GOLVis {
         }
     }
 
-    // renderGrid() {
-    //     const { WORLD_SIZE } = this
-    //     if (!WORLD_SIZE) return
-    //     this.GRID_EL.width = WORLD_SIZE * 20
-    //     this.GRID_EL.height = WORLD_SIZE * 20
+    /** Takes the WORLD set in useWorld and renders it as a png in IMG_EL. 
+     * @description
+     * Slices and downsamples the WORLD to the current VIEWPORT, then
+     * colors it, converts it to a base64 string, and assigns it to IMG_EL.src.
+     * Returns a promise that resolves when the browser has finished rendering 
+     * the image.
+    */
+    render(): Promise<void> {
+        /* fast-png can draw a maximum of 500 * 500 pixels.
+            To render a larger WORLD, first crop and downsample as needed.
+        */
 
+        const { WORLD, IMG_LOAD_EVENT: IMG_LOAD, VISIBLE_SQUARE, IMG_EL } = this
 
-    //     const CTX = <CanvasRenderingContext2D>this.GRID_EL.getContext('2d')
-    //     CTX.strokeStyle = '#FFFFFF'
-    //     CTX.lineWidth = 1
-
-    //     // CTX.restore()
-
-    //     const GRID_CELL_SIZE = 20
-    //     console.log({ GRID_CELL_SIZE })
-
-    //     for (let col = 1; col <= WORLD_SIZE; col++) {
-    //         CTX.moveTo(col * GRID_CELL_SIZE, 0);
-    //         CTX.lineTo(col * GRID_CELL_SIZE, WORLD_SIZE * GRID_CELL_SIZE)
-    //     }
-
-    //     for (let row = 1; row <= WORLD_SIZE; row++) {
-    //         CTX.moveTo(0, row * GRID_CELL_SIZE);
-    //         CTX.lineTo(WORLD_SIZE * GRID_CELL_SIZE, row * GRID_CELL_SIZE)
-    //     }
-    //     CTX.stroke();
-    // }
-
-    render() {
-        const { WORLD, IMG_LOAD, VISIBLE_SQUARE, IMG_EL } = this
         if (!WORLD) {
             console.error('No world to render')
-            return
+            return Promise.reject('No world to render')
         }
-        return new Promise((resolve, reject) => {
-            // Rendering is the slowest part of the app
-            // Instead of rendering the whole world, 
-            // it's much faster to cut the world with the viewport and render just that.
-            // 0,0 is top-left
 
+        return new Promise((resolve, reject) => {
             let NEW_WIDTH, NEW_HEIGHT, IMG_SCALE, IMG_DATA
 
+            // This is sync
             tf.tidy('Render', () => {
-                const CROP_OPERATION = cropAndResizeWorld(WORLD, VISIBLE_SQUARE);
-                ({ NEW_WIDTH, NEW_HEIGHT, IMG_SCALE } = CROP_OPERATION);
-                IMG_DATA = tensorToDataArray(CROP_OPERATION.WORLD_CROPPED_RESIZED.mul(255))
+                const CROP_RESULT = cropAndDownsampleWorld(WORLD, VISIBLE_SQUARE);
+
+                ({ NEW_WIDTH, NEW_HEIGHT, IMG_SCALE } = CROP_RESULT); // We need this info outside the tidy scope
+
+                const WORLD_COLORED = colorWorld(CROP_RESULT.WORLD3D)
+                IMG_DATA = tensorToDataArray(WORLD_COLORED)
             })
 
-            // console.log(IMG_DATA, NEW_WIDTH, NEW_HEIGHT)
-
             drawImage(IMG_DATA, NEW_WIDTH, NEW_HEIGHT, this.IMG_EL)
-            offsetImage(VISIBLE_SQUARE, IMG_SCALE, this.IMG_EL)
+                .then(() => {
+                    offsetImage(VISIBLE_SQUARE, IMG_SCALE, this.IMG_EL)
+                })
+                .then(() => {
+                    resolve()
+                })
 
-            function cropAndResizeWorld(WORLD: tf.Tensor<tf.Rank.R2>, VISIBLE_SQUARE: IVisibleSquare) {
+            /** Crops and downsamples a 2D WORLD to its visible size.
+             * Returns a 3D WORLD because it's useful to color in the next operation
+             */
+            function cropAndDownsampleWorld(WORLD: tf.Tensor<tf.Rank.R2>, VISIBLE_SQUARE: IVisibleSquare) {
                 // PNG encoder can draw a max of 500 * 500 px
                 // Grid can be much larger
                 // Cut and resize, then downscale using tensorflow
@@ -263,59 +245,60 @@ export default class GOLVis {
                 const NEW_WIDTH = Math.ceil(WIDTH * IMG_SCALE),
                     NEW_HEIGHT = Math.ceil(HEIGHT * IMG_SCALE)
 
-                const WORLD_CROPPED_RESIZED =
-                    (<tf.Tensor<tf.Rank.R2>>
-                        (<tf.Tensor<tf.Rank.R3>>WORLD.slice([TOP, LEFT], [HEIGHT, WIDTH])
-                            .expandDims(2)
-                            .toInt()
-                        )
-                            .resizeNearestNeighbor([NEW_HEIGHT, NEW_WIDTH])
-                            .squeeze()
+                const WORLD3D_CROPPED_RESIZED =
+                    (<tf.Tensor<tf.Rank.R3>>WORLD.slice([TOP, LEFT], [HEIGHT, WIDTH])
+                        .expandDims(2)
+                        .toInt()
                     )
+                        .resizeNearestNeighbor([NEW_HEIGHT, NEW_WIDTH])
 
-                return { WORLD_CROPPED_RESIZED, NEW_WIDTH, NEW_HEIGHT, IMG_SCALE }
+                return { WORLD3D: WORLD3D_CROPPED_RESIZED, NEW_WIDTH, NEW_HEIGHT, IMG_SCALE }
 
             }
 
-            function tensorToDataArray(WORLD: tf.Tensor<tf.Rank.R2>) {
+            function colorWorld(WORLD3D: tf.Tensor<tf.Rank.R3>) {
+                const COLOR = tf.tensor3d([[[255, 0, 255]]])
+                return WORLD3D.tile([1,1,3]).mul(COLOR)
+            }
+
+            function tensorToDataArray(WORLD: tf.Tensor<tf.Rank>) {
                 return new Uint8Array(WORLD.bufferSync().values)
             }
 
             function drawImage(DATA_ARRAY, WIDTH, HEIGHT, IMG_EL: HTMLImageElement) {
                 return new Promise((resolve, reject) => {
 
-                    // Using fast-png to encode the WORLD from a 2D array of one channel color
-                    // to a Uint8Array with the PNG data
-
-                    const encoded = encode({
+                    // Function encode from fast-png 
+                    const encoded = PNGencoder({
                         width: WIDTH,
                         height: HEIGHT,
                         data: DATA_ARRAY,
-                        channels: 1
+                        channels: 3
                     })
 
                     const b64 = btoa(String.fromCharCode(...encoded))
                     IMG_EL.src = `data:image/png;base64,${b64}`
 
+                    // If we are watching the image onload event wait for it
                     if (IMG_LOAD) {
                         IMG_LOAD.subscribe(() => resolve())
+                    } else {
+                        resolve()
                     }
 
                 })
             }
 
             function offsetImage(VISIBLE_SQUARE, IMG_SCALE, IMG_EL) {
+                // If we are cutting the world from LEFT or TOP, the image in the DOM will be smaller and shift up or left
+                // To adjust, translate the image relative to BOARD, and scale to compensate for downsampling
                 return new Promise((resolve, reject) => {
-
-                    // If we are cutting the world from LEFT or TOP, the image in the DOM will be smaller and shift up or left
-                    // To adjust, translate the image relative to BOARD, and scale to compensate for downsampling
                     const { TOP, LEFT, WIDTH, HEIGHT } = VISIBLE_SQUARE
                     IMG_EL.style.transform = `translate(${LEFT || 0}px, ${TOP || 0}px) scale(${1 / IMG_SCALE},${1 / IMG_SCALE})`
                     resolve()
                 })
             }
 
-            resolve()
         })
     }
 

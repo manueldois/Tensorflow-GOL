@@ -7,11 +7,11 @@ import GOLDraw from './GOLDraw';
 
 export default class GOLApp {
     STATE: IAppState = {
-        WORLD_SIZE: 10,
+        WORLD_SIZE: 3,
         FRAMES_PER_SECOND: 20,
         STEPS_PER_FRAME: 1,
         RUNNING: false,
-        PAUSED: false,
+        PAUSED: true,
         BACKEND: 'webgl'
     }
 
@@ -26,6 +26,7 @@ export default class GOLApp {
     constructor(public Compute: GOLCompute, public Vis: GOLVis, public Draw: GOLDraw) {
         this.attachUIEventListeners()
         this.updateUI()
+        this.setupWorld()
         this.setBackend(this.STATE.BACKEND)
     }
 
