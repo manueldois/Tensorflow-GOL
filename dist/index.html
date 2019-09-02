@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>TF Game of Life</title>
+  <meta name="viewport" content="width=device-width, user-scalable=no" />
+</head>
+
+<body>
+  <main>
+
+    <section id="viewport">
+      <div id="board">
+        <img id="world" draggable="false">
+        <!-- <canvas id="world" width="100" height="100"></canvas> -->
+      </div>
+    </section>
+
+    <section id="console"></section>
+
+    <section id="controls">
+
+      <div class="buttons">
+
+        <label>
+          World Size:
+          <select name="worldsize" data-action="onWorldSize" data-value="WORLD_SIZE">
+            <option value="10">10 * 10</option>            
+            <option value="100">100 * 100</option>
+            <option value="200">200 * 200</option>
+            <option value="500">500 * 500</option>
+            <option value="1000">1000 * 1000</option>
+            <option value="2000">2000 * 2000</option>
+            <option value="4000">4000 * 4000</option>
+
+          </select>
+        </label>
+
+        <label>
+          TF Backend:
+          <select name="tfbackend" data-action="setBackend" data-value="BACKEND">
+            <option value="cpu">CPU</option>
+            <option value="webgl">WebGL</option>
+          </select>
+        </label>
+
+
+        <button type="button" data-action="next"> <span>Next</span></button>
+        <button type="button" data-action="restart"> <span>Restart</span></button>
+        <button type="button" data-action="randomizeWorld"> <span>Randomize World</span></button>
+        <button type="button" data-action="clear"> <span>Clear</span></button>
+
+        <label for="IN_pause">
+          <input type="checkbox" id="IN_pause" data-action="onPause" data-value="PAUSED">
+          <span>Pause</span>
+        </label>
+      </div>
+
+
+      <div class="sliders">
+        <label class="above">
+          Frames per second: <span class="value" data-value="FRAMES_PER_SECOND"></span>
+          <input type="range" data-action="onFPS" data-value="FRAMES_PER_SECOND" min="0" max="30" step="1">
+        </label>
+
+        <label class="above">
+          Steps per frame: <span class="value" data-value="STEPS_PER_FRAME"></span>
+          <input type="range" data-action="onStepsPerFrame" data-value="STEPS_PER_FRAME" min="1" max="20" step="1">
+        </label>
+      </div>
+
+    </section>
+  </main>
+<script type="text/javascript" src="bundle.js"></script></body>
+
+</html>

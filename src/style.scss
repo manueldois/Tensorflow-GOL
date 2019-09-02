@@ -1,0 +1,148 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 100vw;
+  min-height: 100vh;
+  background-color: #34495e;
+  margin: 0;
+  padding-top: 10px;
+  overflow: hidden;
+  font-family: Ubuntu, Verdana, Geneva, Tahoma, sans-serif;
+  //   font-weight: bold;
+}
+
+main {
+  width: 100vw;
+  margin: auto;
+  height: 100vh;
+}
+
+section#controls {
+  position: absolute;
+  bottom: 0;
+  padding: 8px 20px;
+  transform: translate(-50%, 0);
+  left: 50%;
+  width: 100%;
+  background-color: rgb(126, 58, 58);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+
+  label {
+    color: white;
+    // min-height: 30px;
+  }
+
+  label > span {
+    color: white;
+  }
+}
+
+div.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 6px;
+  margin-top: 6px;
+
+  > label,
+  button, input {
+    margin-left: 15px;
+    margin-bottom: 10px;
+
+    &:first-child {
+      margin-left: 0;
+    }
+
+    &:last-child {
+      margin-right: 15px;
+    }
+  }
+}
+
+div.sliders {
+  > label {
+    display: inline-block;
+    width: 350px;
+    padding: 10px;
+
+    > input {
+      width: 100%;
+    }
+  }
+
+  @media screen and (max-width: 800px) {
+    & {
+      width: 100%;
+    }
+    > label {
+      display: block;
+      width: 100%;
+    }
+  }
+}
+
+section#console {
+  position: absolute;
+  top: 0;
+  padding: 6px;
+  outline: 1px solid white;
+  transform: translate(-50%, 0);
+  left: 50%;
+  width: 100%;
+
+  > div {
+    margin: 4px 4px;
+    padding: 3px;
+    display: inline-flex;
+    // width: fit-content;
+    background-color: darkorange;
+
+    > span {
+      margin: 4px 4px;
+
+      &:nth-of-type(2) {
+        display: block;
+        text-align: right;
+        width: 50px;
+      }
+    }
+  }
+}
+
+section#viewport {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: auto;
+  width: 100vw;
+  height: 100vh;
+
+  outline: 2px solid green;
+  background-color: rgb(50, 50, 50);
+
+  > div#board {
+    outline: 1px solid red;
+
+    > img#world {
+      // outline: 1px solid green;
+      position: absolute;
+      transform-origin: 0% 0%;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    // > canvas#grid {
+    //   width: 1000%;
+    //   height: 1000%;
+    //   position: absolute;
+    //   transform-origin: 0% 0%;
+    //   transform: scale(0.1);
+    // }
+  }
+}
