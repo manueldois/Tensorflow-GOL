@@ -1,11 +1,14 @@
 import * as tf from '@tensorflow/tfjs-core'
+import { printVectors } from './util';
 
 /** Computes and mutates a GOL world using tensorflow
  * this.WORLD is a reference to the world used throught the app
  */
 export default class GOLCompute {
     WORLD: tf.Variable<tf.Rank.R2> | null = null
-    
+
+    ITERATION = 0
+
     useWorld(WORLD: tf.Variable<tf.Rank.R2>) {
         this.WORLD = WORLD
     }
@@ -14,10 +17,13 @@ export default class GOLCompute {
      * the result back to the WORLD TF variable
      */
     nextState() {
+
         if (!this.WORLD) throw new Error('Got no WORLD')
         const WORLD = this.WORLD
         const WORLD_SIZE = WORLD.shape[1]
         if (!WORLD_SIZE) throw new Error('Invalid WORLD_SIZE')
+
+        this.ITERATION++
 
         tf.tidy(() => {
 
@@ -27,10 +33,12 @@ export default class GOLCompute {
             // image recognition, but does the same math as what is
             // needed here in Game of Life
 
+            const WORLD_BOOL = WORLD.toBool()
+
             // Tensorflow wants the input as 3D tensors of shape [batch, width, height, channel]
             // We'v only one image to compute so batch is 1, and one channel (cell on or off)
             const SHAPE3D: any = [WORLD_SIZE, WORLD_SIZE, 1]
-            const WORLD3D = <tf.Tensor<tf.Rank.R3>>WORLD.reshape(SHAPE3D)
+            const WORLD3D_BOOL = <tf.Tensor<tf.Rank.R3>>WORLD_BOOL.reshape(SHAPE3D)
             const FILTER = <tf.Tensor<tf.Rank.R4>>tf.tensor(
                 [
                     [[[1]], [[1]], [[1]]],
@@ -40,7 +48,7 @@ export default class GOLCompute {
             )
 
             // Do the convolution and squeeze the 3D result back to a 2D tensor
-            const N_NEIGHBORS = <tf.Tensor<tf.Rank.R2>>tf.conv2d(WORLD3D.toInt(), FILTER, [1, 1], 'same').squeeze()
+            const N_NEIGHBORS = <tf.Tensor<tf.Rank.R2>>tf.conv2d(WORLD3D_BOOL.toInt(), FILTER, [1, 1], 'same').squeeze()
 
             /*
             The Rules
@@ -57,23 +65,30 @@ export default class GOLCompute {
             // For the result do (D or C)
 
             // C  Is 'populated' && two or three neighbors
-            const RULE_C = WORLD
+            const RULE_C = WORLD_BOOL
                 .logicalAnd(
                     N_NEIGHBORS.equal(2)
                         .logicalOr(
                             N_NEIGHBORS.equal(3)
                         )
-                )
+                ).toInt()
 
             // D  Is 'empty' && three neighbors
-            const RULE_D = WORLD
+            const RULE_D = WORLD_BOOL
                 .logicalNot()
                 .logicalAnd(
                     N_NEIGHBORS.equal(3)
-                )
+                ).toInt()
 
-            const NEXT_WORLD = <tf.Tensor<tf.Rank.R2>>tf.logicalOr(RULE_C, RULE_D)
+            const NEXT_WORLD = <tf.Tensor<tf.Rank.R2>>
+                WORLD
+                    .mul(RULE_C)
+                    .add(1)
+                    .mul(RULE_C)
+                    .add(RULE_D)
+                    .toInt()
 
+            // printVectors({ NEXT_WORLD })
             WORLD.assign(NEXT_WORLD)
         })
 

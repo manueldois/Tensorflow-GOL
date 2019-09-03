@@ -2,8 +2,10 @@ import { ISize, IVector, ITransform, IRect, IVisibleSquare } from './interfaces'
 import * as tf from '@tensorflow/tfjs-core'
 import panzoom, { PanZoom } from 'panzoom'
 import { encode as PNGencoder } from 'fast-png'
-import { printVectors } from './util'
+import { printVectors, logger, Timeline } from './util'
 import * as rxjs from 'rxjs'
+import GOLCompute from './GOLCompute';
+import { reject } from 'async';
 
 /** Provides rendering, panning, and zooming for GOL.
  * @description
@@ -13,7 +15,11 @@ import * as rxjs from 'rxjs'
  * In the DOM, 1px = 1cell. Zooming is achieved by using the view layer (css tranform)
 */
 export default class GOLVis {
-    constructor(public VIEWPORT_EL: HTMLElement, public BOARD_EL: HTMLElement, public IMG_EL: HTMLImageElement) {
+    constructor(public VIEWPORT_EL: HTMLElement,
+        public BOARD_EL: HTMLElement,
+        public IMG_EL: HTMLImageElement,
+        public Compute?: GOLCompute
+    ) {
         if (!VIEWPORT_EL) throw new Error('Got no viewport element')
         if (!BOARD_EL) throw new Error('Got no board element')
         if (!IMG_EL) throw new Error('Got no image element')
@@ -197,109 +203,174 @@ export default class GOLVis {
      * the image.
     */
     render(): Promise<void> {
+
+
         /* fast-png can draw a maximum of 500 * 500 pixels.
             To render a larger WORLD, first crop and downsample as needed.
         */
 
-        const { WORLD, IMG_LOAD_EVENT: IMG_LOAD, VISIBLE_SQUARE, IMG_EL } = this
+        const { WORLD, IMG_LOAD_EVENT, VISIBLE_SQUARE, IMG_EL, Compute } = this
 
         if (!WORLD) {
-            console.error('No world to render')
-            return Promise.reject('No world to render')
+            throw new Error('No world to render')
         }
 
         return new Promise((resolve, reject) => {
-            let NEW_WIDTH, NEW_HEIGHT, IMG_SCALE, IMG_DATA
+            try {
+                let NEW_WIDTH, NEW_HEIGHT, IMG_SCALE, IMG_DATA
+                let timeline = new Timeline('Render')
 
-            // This is sync
-            tf.tidy('Render', () => {
-                const CROP_RESULT = cropAndDownsampleWorld(WORLD, VISIBLE_SQUARE);
+                // This is sync
+                tf.tidy('Render', () => {
 
-                ({ NEW_WIDTH, NEW_HEIGHT, IMG_SCALE } = CROP_RESULT); // We need this info outside the tidy scope
+                    const CROP_RESULT = cropAndDownsampleWorld(WORLD, VISIBLE_SQUARE);
+                    // CROP_RESULT.WORLD3D.arraySync()
+                    timeline.mark('cutAndDownsample');
 
-                const WORLD_COLORED = colorWorld(CROP_RESULT.WORLD3D)
-                IMG_DATA = tensorToDataArray(WORLD_COLORED)
-            })
+                    ({ NEW_WIDTH, NEW_HEIGHT, IMG_SCALE } = CROP_RESULT); // We need this info outside the tidy scope
 
-            drawImage(IMG_DATA, NEW_WIDTH, NEW_HEIGHT, this.IMG_EL)
-                .then(() => {
-                    offsetImage(VISIBLE_SQUARE, IMG_SCALE, this.IMG_EL)
+                    const WORLD_COLORED = colorWorld(CROP_RESULT.WORLD3D)
+                    // WORLD_COLORED.arraySync()
+                    timeline.mark('color');
+
+                    IMG_DATA = tensorToDataArray(WORLD_COLORED)
+                    timeline.mark('tensorToDataArray');
+
                 })
-                .then(() => {
-                    resolve()
-                })
 
-            /** Crops and downsamples a 2D WORLD to its visible size.
-             * Returns a 3D WORLD because it's useful to color in the next operation
-             */
-            function cropAndDownsampleWorld(WORLD: tf.Tensor<tf.Rank.R2>, VISIBLE_SQUARE: IVisibleSquare) {
-                // PNG encoder can draw a max of 500 * 500 px
-                // Grid can be much larger
-                // Cut and resize, then downscale using tensorflow
-
-                const { TOP, LEFT, BOTTOM, RIGHT, WIDTH, HEIGHT } = VISIBLE_SQUARE
-
-                // If size > 500 * 500 px, IMG_SCALE = 0.5, if > 500 * 500 * 2 px, 0.25 etc
-                const IMG_SCALE = 1 / Math.ceil(Math.sqrt((WIDTH * HEIGHT) / (500 * 500)))
-
-                const NEW_WIDTH = Math.ceil(WIDTH * IMG_SCALE),
-                    NEW_HEIGHT = Math.ceil(HEIGHT * IMG_SCALE)
-
-                const WORLD3D_CROPPED_RESIZED =
-                    (<tf.Tensor<tf.Rank.R3>>WORLD.slice([TOP, LEFT], [HEIGHT, WIDTH])
-                        .expandDims(2)
-                        .toInt()
-                    )
-                        .resizeNearestNeighbor([NEW_HEIGHT, NEW_WIDTH])
-
-                return { WORLD3D: WORLD3D_CROPPED_RESIZED, NEW_WIDTH, NEW_HEIGHT, IMG_SCALE }
-
-            }
-
-            function colorWorld(WORLD3D: tf.Tensor<tf.Rank.R3>) {
-                const COLOR = tf.tensor3d([[[255, 0, 255]]])
-                return WORLD3D.tile([1,1,3]).mul(COLOR)
-            }
-
-            function tensorToDataArray(WORLD: tf.Tensor<tf.Rank>) {
-                return new Uint8Array(WORLD.bufferSync().values)
-            }
-
-            function drawImage(DATA_ARRAY, WIDTH, HEIGHT, IMG_EL: HTMLImageElement) {
-                return new Promise((resolve, reject) => {
-
-                    // Function encode from fast-png 
-                    const encoded = PNGencoder({
-                        width: WIDTH,
-                        height: HEIGHT,
-                        data: DATA_ARRAY,
-                        channels: 3
+                drawImage(IMG_DATA, NEW_WIDTH, NEW_HEIGHT, this.IMG_EL)
+                    .then(() => {
+                        timeline.mark('drawImage');
+                        offsetImage(VISIBLE_SQUARE, IMG_SCALE, this.IMG_EL)
+                        timeline.mark('offsetImage');
+                        timeline.end()
+                        resolve()
                     })
 
-                    const b64 = btoa(String.fromCharCode(...encoded))
-                    IMG_EL.src = `data:image/png;base64,${b64}`
+                /** Crops and downsamples a 2D WORLD to its visible size.
+                 * Returns a 3D WORLD because it's useful to color in the next operation
+                 */
+                function cropAndDownsampleWorld(WORLD: tf.Tensor<tf.Rank.R2>, VISIBLE_SQUARE: IVisibleSquare) {
+                    // PNG encoder can draw a max of 500 * 500 px
+                    // Grid can be much larger
+                    // Cut and resize, then downscale using tensorflow
 
-                    // If we are watching the image onload event wait for it
-                    if (IMG_LOAD) {
-                        IMG_LOAD.subscribe(() => resolve())
-                    } else {
-                        resolve()
+                    const { TOP, LEFT, BOTTOM, RIGHT, WIDTH, HEIGHT } = VISIBLE_SQUARE
+
+                    // If size > 500 * 500 px, IMG_SCALE = 0.5, if > 500 * 500 * 2 px, 0.25 etc
+                    const IMG_SCALE = 1 / Math.ceil(Math.sqrt((WIDTH * HEIGHT) / (500 * 500)))
+
+                    const NEW_WIDTH = Math.ceil(WIDTH * IMG_SCALE),
+                        NEW_HEIGHT = Math.ceil(HEIGHT * IMG_SCALE)
+
+                    const WORLD3D_CROPPED_RESIZED =
+                        (<tf.Tensor<tf.Rank.R3>>WORLD.slice([TOP, LEFT], [HEIGHT, WIDTH])
+                            .expandDims(2)
+                        )
+                            .resizeNearestNeighbor([NEW_HEIGHT, NEW_WIDTH])
+
+                    // printVectors({ WORLD3D_CROPPED_RESIZED })
+
+                    return { WORLD3D: WORLD3D_CROPPED_RESIZED, NEW_WIDTH, NEW_HEIGHT, IMG_SCALE }
+
+                }
+
+                function colorWorld(WORLD3D: tf.Tensor<tf.Rank.R3>) {
+                    if (false) {
+
+                        const WORLD3D_BOOL = WORLD3D.toBool()
+
+                        /** Scalar smoothing function: f(X), X: [0, +inf], f(X): [0, 1].
+                         * @description
+                         * Variable smoothing factor A: [0, +inf].
+                         * f(X) = (1 + A)/(X + 1 + A).
+                         * f(0) = 1, f(+inf) = 0.
+                         * Bigger A = Slower fall to zero (smaller derivative).
+                         * A = 0: f(1) = 1/2, f(2) = 1/3 ...
+                         * A = 1: f(1) = 1/3, f(2) = 1/4 ... 
+                        */
+                        function smoothTensor(X: tf.Tensor<tf.Rank>, A: number = 0) {
+                            // f(X) = (1 + A)/(X + 1 + A)
+                            // f(X) = 1/(X + 1 + A) * (1 + A)
+                            return X
+                                .clipByValue(0, Infinity) // Assert X >= 0 
+                                .add(1 + A) // (X + 1 + A)
+                                .reciprocal() // 1/(X + 1 + A)
+                                .mul(1 + A) // 1/(X + 1 + A) * (1 + A) = f(X)
+                        }
+
+                        /** For a Tensor X representing a ratio [0, 1], calculate 1 - X */
+                        function invertTensor(X: tf.Tensor<tf.Rank>) {
+                            return X.neg().add(1)
+                        }
+
+                        const COLOR_A = tf.tensor([1, 0, 1])
+                        const COLOR_B = tf.tensor([1, 1, 1])
+
+                        const COLOR_A_RATIO = smoothTensor(WORLD3D.sub(1), 3).mul(WORLD3D_BOOL)
+                        const COLOR_B_RATIO = invertTensor(COLOR_A_RATIO).mul(WORLD3D_BOOL)
+
                     }
 
-                })
-            }
 
-            function offsetImage(VISIBLE_SQUARE, IMG_SCALE, IMG_EL) {
-                // If we are cutting the world from LEFT or TOP, the image in the DOM will be smaller and shift up or left
-                // To adjust, translate the image relative to BOARD, and scale to compensate for downsampling
-                return new Promise((resolve, reject) => {
+
+                    if (Compute && false) {
+                        // const COLOR_COMB = tf.addN([
+                        //     COLOR_A.mul(COLOR_A_RATIO),
+                        //     COLOR_B.mul(COLOR_B_RATIO)
+                        // ])
+
+                        // const WORLD_COLOR = COLOR_COMB.mul(255).toInt()
+                        // return WORLD_COLOR
+
+                    } else {
+                        return WORLD3D.toBool()
+                            .tile([1, 1, 3]) // From 1 channel [L] to 3 channel [R,G,B]
+                            .mul(255) // Just paint white
+                    }
+                }
+
+                function tensorToDataArray(WORLD: tf.Tensor<tf.Rank>) {
+                    return new Uint8Array(WORLD.bufferSync().values)
+                }
+
+                function drawImage(DATA_ARRAY, WIDTH, HEIGHT, IMG_EL: HTMLImageElement) {
+                    return new Promise((resolve, reject) => {
+
+                        // Function encode from fast-png 
+                        const encoded = PNGencoder({
+                            width: WIDTH,
+                            height: HEIGHT,
+                            data: DATA_ARRAY,
+                            channels: 3
+                        })
+
+                        const b64 = btoa(String.fromCharCode(...encoded))
+                        IMG_EL.src = `data:image/png;base64,${b64}`
+
+                        // If we are watching the image onload event wait for it
+                        if (IMG_LOAD_EVENT) {
+                            IMG_LOAD_EVENT.subscribe(() => resolve())
+                        } else {
+                            resolve()
+                        }
+
+                    })
+                }
+
+                function offsetImage(VISIBLE_SQUARE, IMG_SCALE, IMG_EL) {
+                    // If we are cutting the world from LEFT or TOP, the image in the DOM will be smaller and shift up or left
+                    // To adjust, translate the image relative to BOARD, and scale to compensate for downsampling
                     const { TOP, LEFT, WIDTH, HEIGHT } = VISIBLE_SQUARE
                     IMG_EL.style.transform = `translate(${LEFT || 0}px, ${TOP || 0}px) scale(${1 / IMG_SCALE},${1 / IMG_SCALE})`
-                    resolve()
-                })
-            }
+                }
 
+            } catch (error) {
+                console.error('Failed to render.', error)
+                reject(error)
+            }
         })
+
     }
 
 

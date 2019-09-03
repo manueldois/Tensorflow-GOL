@@ -30,6 +30,11 @@ class Logger {
         this.Log.set(name, value)
     }
 
+    time(name, time){
+        this.Log.set(name + ' ms', Math.round(time) )
+        if(time > 100) console.log(name + ' : ' + time)
+    }
+
     printLogToConsole(){
         this.Console_El.innerHTML = ''
         for(let keyVal of this.Log){
@@ -49,5 +54,32 @@ class Logger {
     }
 }
 
+class Timeline {
+    TIMES = new Map()
+    START_TIME = Date.now()
+    PREVIOUS_TIME = Date.now()
+    END_TIME: number | undefined
+    RUN_DURATION: number | undefined
+
+    constructor(public NAME: string){
+
+    }
+
+    mark(LABEL: string){
+        this.TIMES.set(LABEL, Date.now() - this.PREVIOUS_TIME)
+        this.PREVIOUS_TIME = Date.now()
+    }
+
+    end(){
+        this.END_TIME = Date.now()
+        this.RUN_DURATION = this.END_TIME - this.START_TIME
+        this.TIMES.set('TOTAL', this.RUN_DURATION)
+
+        if(this.RUN_DURATION > 100){
+            console.log(this.TIMES.entries())
+        }
+    }
+}
+
 const logger = new Logger() 
-export { printVectors, logger }
+export { printVectors, logger, Timeline }

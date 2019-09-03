@@ -1,9 +1,6 @@
 import { ISize, IVector, ITransform, IRect, IVisibleSquare } from './interfaces'
 import * as tf from '@tensorflow/tfjs-core'
 import GOLVis from './GOLVis';
-import * as rxjs from 'rxjs'
-import { throttle, delay, debounce, last, debounceTime, buffer } from 'rxjs/operators'
-import { printVectors } from './util';
 
 export default class GOLDraw {
     WORLD: tf.Variable<tf.Rank.R2> | null = null
@@ -31,24 +28,25 @@ export default class GOLDraw {
 
         this.Vis.BOARD_EL.addEventListener('mouseup', e => {
             if(Date.now() - this.MOUSEDOWNTIME < 200){
-
                 const MOUSE_COORDS = [
                     (e.clientX), 
                     (e.clientY)
                 ]
-
-                const CELL_COORDS = [
-                    Math.floor((MOUSE_COORDS[1] - this.Vis.BOARD.Y) / this.Vis.SCALE),
-                    Math.floor((MOUSE_COORDS[0] - this.Vis.BOARD.X) / this.Vis.SCALE),
-                ]
-
-                if(this.WORLD){
-                    const BUFFER = this.WORLD.bufferSync()
-                    const CELL = BUFFER.get(...CELL_COORDS)
-                    CELL ? BUFFER.set(0, ...CELL_COORDS) : BUFFER.set(1, ...CELL_COORDS)
-                    this.Vis.render()
-                }
+                this.onClick(MOUSE_COORDS);
             }
         })
+    }
+
+    onClick(MOUSE_COORDS: number[]) {
+        const CELL_COORDS = [
+            Math.floor((MOUSE_COORDS[1] - this.Vis.BOARD.Y) / this.Vis.SCALE),
+            Math.floor((MOUSE_COORDS[0] - this.Vis.BOARD.X) / this.Vis.SCALE),
+        ];
+        if (this.WORLD) {
+            const BUFFER = this.WORLD.bufferSync();
+            const CELL = BUFFER.get(...CELL_COORDS);
+            CELL ? BUFFER.set(0, ...CELL_COORDS) : BUFFER.set(1, ...CELL_COORDS);
+            this.Vis.render();
+        }
     }
 }

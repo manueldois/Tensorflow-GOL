@@ -7,11 +7,11 @@ import GOLDraw from './GOLDraw';
 
 export default class GOLApp {
     STATE: IAppState = {
-        WORLD_SIZE: 3,
+        WORLD_SIZE: 100,
         FRAMES_PER_SECOND: 20,
         STEPS_PER_FRAME: 1,
         RUNNING: false,
-        PAUSED: true,
+        PAUSED: false,
         BACKEND: 'webgl'
     }
 
@@ -149,7 +149,7 @@ export default class GOLApp {
 
         // If there is not an initial world, or meanwhile the user changed the world size, just start at zeros
         if (!this.INITIAL_WORLD || this.INITIAL_WORLD.shape[0] !== WORLD_SIZE) {
-            this.INITIAL_WORLD = <tf.Tensor<tf.Rank.R2>>tf.zeros([WORLD_SIZE, WORLD_SIZE]).toBool()
+            this.INITIAL_WORLD = <tf.Tensor<tf.Rank.R2>>tf.zeros([WORLD_SIZE, WORLD_SIZE], 'int32')
         }
 
         this.WORLD = tf.variable(this.INITIAL_WORLD)
@@ -160,7 +160,7 @@ export default class GOLApp {
 
     randomizeWorld() {
         const { WORLD_SIZE, RUNNING } = this.STATE
-        this.INITIAL_WORLD = tf.randomUniform([WORLD_SIZE, WORLD_SIZE], -1, 2, 'bool')
+        this.INITIAL_WORLD = tf.randomUniform([WORLD_SIZE, WORLD_SIZE], -1, 2, 'int32')
 
         if (RUNNING) this.restart()
     }
@@ -209,12 +209,4 @@ export default class GOLApp {
         this.STATE.STEPS_PER_FRAME = value
         this.updateUI()
     }
-
-    attachHTMLElement(CONTROL): [HTMLElement, Function | string] {
-        const ELEMENT = document.getElementById(CONTROL[0])
-        if (!ELEMENT) throw new Error('Failed to find control: ' + CONTROL[0])
-        CONTROL[0] = ELEMENT
-        return CONTROL
-    }
-
 }
