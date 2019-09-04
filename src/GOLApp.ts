@@ -1,36 +1,51 @@
 import * as tf from '@tensorflow/tfjs-core'
-import { IAppState } from "./interfaces";
 import GOLCompute from "./GOLCompute";
 import GOLVis from "./GOLVis";
-import { printVectors, logger } from './util';
+import { printVectors, LOGGER, Timeline } from './util';
 import GOLDraw from './GOLDraw';
 
+
+/**
+ * Glues the app togheter. Manages UI and communication between GOLCompute, GOLDraw, and GOLVis
+ * @param GOLCompute The GOLCompute instance
+ * @param GOLVis The GOLVis instance
+ * @param GOLDraw The GOLDraw instance (optional)
+ * 
+ */
 export default class GOLApp {
-    STATE: IAppState = {
-        WORLD_SIZE: 100,
+    STATE = {
+        WORLD_SIZE: 200,
         FRAMES_PER_SECOND: 20,
         STEPS_PER_FRAME: 1,
         RUNNING: false,
         PAUSED: false,
-        BACKEND: 'webgl'
+        BACKEND: 'webgl',
+        COLOR1: '#19dae0'
     }
 
+    /**  A 2D World Tensor Variable Shape [H, W] Dtype int32.
+    *  A zero is a dead cell. A value > zero is a living cell, and it represents the age of the cell.
+    */
+    WORLD: tf.Variable<tf.Rank.R2> | null = null
+
+    /** List of HTMLElements that are marked as a control input in the HTML template */
     CONTROLS = document.querySelectorAll('[data-action]')
+    /** List of HTMLElements that are marked as a binding variable in the HTML template */
     BINDINGS = document.querySelectorAll('[data-value]')
 
-    WORLD: tf.Variable<tf.Rank.R2> | null = null
     INITIAL_WORLD: tf.Tensor<tf.Rank.R2> | null = null
 
     LOOPTIMER: number = 0
 
-    constructor(public Compute: GOLCompute, public Vis: GOLVis, public Draw: GOLDraw) {
-        this.attachUIEventListeners()
+    constructor(public Compute: GOLCompute, public Vis: GOLVis, public Draw?: GOLDraw) {
+        this.attachControls()
         this.updateUI()
         this.setupWorld()
         this.setBackend(this.STATE.BACKEND)
+        this.Vis.setColors('', this.STATE.COLOR1)
     }
 
-    attachUIEventListeners() {
+    attachControls() {
         const STATE = this.STATE
         const CONTROLS = this.CONTROLS
 
@@ -42,7 +57,7 @@ export default class GOLApp {
 
             switch (EL.tagName) {
                 case 'INPUT':
-                    if (EL.type === 'range') {
+                    if (EL.type === 'range' || EL.type === 'color') {
                         EL.addEventListener('input', e => {
                             const VALUE = e.target.value
                             if (typeof ACTION === 'function') this[ACTION_NAME](VALUE)
@@ -92,7 +107,7 @@ export default class GOLApp {
 
             switch (EL.tagName) {
                 case 'INPUT':
-                    if (EL.type === 'range') {
+                    if (EL.type === 'range' || EL.type === 'color') {
                         EL.value = VALUE
                     }
                     if (EL.type === 'checkbox') {
@@ -113,28 +128,35 @@ export default class GOLApp {
     }
 
     async loop() {
-        const time_start = Date.now()
+        if (!this.WORLD) return
+        if (!this.STATE.RUNNING) return
+
+        const TIMELINE = new Timeline('Loop')
 
         await this.Vis.render()
-        logger.log("Render duration (ms)", Date.now() - time_start)
+        TIMELINE.mark('Render')
 
         if (!this.STATE.PAUSED) {
-            const time_start_compute = Date.now()
             for (let i = 0; i < this.STATE.STEPS_PER_FRAME; i++) {
                 this.Compute.nextState()
             }
-            if (this.WORLD) {
-                await this.WORLD.data()
-            }
-            logger.log("Compute duration (ms)", Date.now() - time_start_compute)
+            await this.WORLD.data()
+            TIMELINE.mark('Compute')
         }
-        const tf_memory = tf.memory()
-        logger.log("N Tensors in memory", tf_memory.numTensors)
-        logger.log("N Bytes in memory (kB)", tf_memory.numBytes / 1000)
-        console.log(tf_memory.numBytes)
 
-        logger.printLogToConsole()
-        this.LOOPTIMER = setTimeout(() => this.loop(), 1000 / this.STATE.FRAMES_PER_SECOND)
+        TIMELINE.end()
+
+        const TF_MEMORY = tf.memory()
+        LOGGER.log("Render duration (ms)", TIMELINE.TIMES.get('Render'))
+        LOGGER.log("Compute duration (ms)", TIMELINE.TIMES.get('Compute'))
+        LOGGER.log("N Tensors in memory", TF_MEMORY.numTensors)
+        LOGGER.log("N bytes in memory (kB)", Math.round(TF_MEMORY.numBytes / 1000))
+        LOGGER.log("Population: ", tf.tidy(() => this.WORLD ? this.WORLD.toBool().sum().dataSync() : 0))
+
+        LOGGER.log("Real FPS", Math.min(this.STATE.FRAMES_PER_SECOND, Math.round(1000 / TIMELINE.RUN_DURATION)))
+        LOGGER.printLogToConsole()
+        const TIME_TO_NEXT_FRAME = Math.max(0, 1000 / this.STATE.FRAMES_PER_SECOND - TIMELINE.RUN_DURATION)
+        window.setTimeout(() => this.loop(), TIME_TO_NEXT_FRAME)
     }
 
     start() {
@@ -164,7 +186,8 @@ export default class GOLApp {
         this.WORLD = tf.variable(this.INITIAL_WORLD)
         this.Compute.useWorld(this.WORLD)
         this.Vis.useWorld(this.WORLD)
-        this.Draw.useWorld(this.WORLD)
+
+        if(this.Draw) this.Draw.useWorld(this.WORLD)
     }
 
     randomizeWorld() {
@@ -198,8 +221,9 @@ export default class GOLApp {
     }
 
     onPause(paused: boolean) {
+        console.log(paused)
         if (paused) {
-            this.STATE.PAUSED = true
+            this.STATE.PAUSED = paused
         } else {
             this.STATE.PAUSED = false
         }
@@ -209,6 +233,11 @@ export default class GOLApp {
     onFPS(value: number) {
         this.STATE.FRAMES_PER_SECOND = value
         this.updateUI()
+    }
+
+    onColor(color: string){
+        this.STATE.COLOR1 = color
+        this.Vis.setColors('', color)
     }
 
     onWorldSize(value: number) {

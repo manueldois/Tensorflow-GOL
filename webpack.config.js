@@ -1,12 +1,15 @@
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 const path = require('path');
+
 
 module.exports = {
     entry: {
         bundle: './src/index.ts',
     },
-    watch: true,
-    mode: 'development',
+    // watch: true,
+    // mode: 'development',
     output: {
         filename: '[name].js',
         path: path.resolve(__dirname, 'dist')
@@ -14,7 +17,11 @@ module.exports = {
     plugins: [
         new HtmlWebpackPlugin({
             template: './src/index.html'
-        })
+        }),
+        new MiniCssExtractPlugin({
+            filename: 'style.css'
+        }),
+        new CopyWebpackPlugin([{     from:'./src/assets',      to:'./assets'   }])
     ],
     resolve: {
         extensions: ['.tsx', '.ts', '.js']
@@ -22,26 +29,16 @@ module.exports = {
     module: {
         rules: [
             {
-                test: /\.css$/,
-                use: [
-                    'style-loader',
-                    'css-loader'
-                ]
-            },
-            {
                 test: /\.scss$/,
-                use: [
-                    'style-loader',
-                    'css-loader',
-                    'sass-loader'
-                ]
+                use: [MiniCssExtractPlugin.loader, 'css-loader', 'sass-loader'],
             },
             {
                 test: /\.ts$/,
                 use: [
                     'ts-loader'
                 ]
-            }
+            },
+            
         ]
     }
 };

@@ -5,7 +5,8 @@
   <meta charset="UTF-8">
   <title>TF Game of Life</title>
   <meta name="viewport" content="width=device-width, user-scalable=no" />
-</head>
+  <link rel="stylesheet" href="style.css">
+<link href="style.css" rel="stylesheet"></head>
 
 <body>
   <main>
@@ -13,11 +14,19 @@
     <section id="viewport">
       <div id="board">
         <img id="world" draggable="false">
-        <!-- <canvas id="world" width="100" height="100"></canvas> -->
       </div>
     </section>
 
-    <section id="console"></section>
+    <section id="console">
+      <input type="checkbox" name="expand-console" id="IN_expand-console">
+      <label for="IN_expand-console">
+        <span>console</span>
+        <img src="assets/icons/angle-arrow-down.svg" width="15px" alt="">
+      </label>
+      <div class="log">
+
+      </div>
+    </section>
 
     <section id="controls">
 
@@ -26,7 +35,7 @@
         <label>
           World Size:
           <select name="worldsize" data-action="onWorldSize" data-value="WORLD_SIZE">
-            <option value="10">10 * 10</option>            
+            <option value="10">10 * 10</option>
             <option value="100">100 * 100</option>
             <option value="200">200 * 200</option>
             <option value="500">500 * 500</option>

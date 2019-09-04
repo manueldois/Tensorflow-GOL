@@ -1,12 +1,12 @@
-import { ISize, IVector, ITransform, IRect, IVisibleSquare } from './interfaces'
 import * as tf from '@tensorflow/tfjs-core'
 import GOLVis from './GOLVis';
 
+/** Provides functionaly to allow the user to draw onto the GOL World */
 export default class GOLDraw {
     WORLD: tf.Variable<tf.Rank.R2> | null = null
     WORLD_SIZE: number | null = null
 
-    MOUSEDOWNTIME: number = 0
+    FINGER_DOWN_TIME: number = 0
 
     constructor(public Vis: GOLVis) {
         this.attachEventListeners()
@@ -22,19 +22,41 @@ export default class GOLDraw {
     }
 
     attachEventListeners() {
-        this.Vis.BOARD_EL.addEventListener('mousedown', () => {
-            this.MOUSEDOWNTIME = Date.now()
-        })
+        const fingerDown = (e: (TouchEvent | MouseEvent)) => {
+            this.FINGER_DOWN_TIME = Date.now()
+        }
 
-        this.Vis.BOARD_EL.addEventListener('mouseup', e => {
-            if(Date.now() - this.MOUSEDOWNTIME < 200){
-                const MOUSE_COORDS = [
-                    (e.clientX), 
-                    (e.clientY)
-                ]
+        const fingerUp = (e: (TouchEvent | MouseEvent)) => {
+            // Detect a tap
+            if (Date.now() - this.FINGER_DOWN_TIME < 200) {
+                let MOUSE_COORDS: number[] = []
+
+                if (e.type == 'mouseup') {
+                    e = <MouseEvent> e
+                    MOUSE_COORDS = [
+                        (e.clientX),
+                        (e.clientY)
+                    ]
+                }
+
+                if (e.type == 'touchend') {
+                    e = <TouchEvent> e
+                    MOUSE_COORDS = [
+                        (e.changedTouches[0].clientX),
+                        (e.changedTouches[0].clientY)
+                    ]
+                }
+
+                if(MOUSE_COORDS === []) return
                 this.onClick(MOUSE_COORDS);
             }
-        })
+        }
+
+        this.Vis.BOARD_EL.addEventListener('mousedown', fingerDown)
+        this.Vis.BOARD_EL.addEventListener('touchstart', fingerDown) // For mobile
+
+        this.Vis.BOARD_EL.addEventListener('mouseup', fingerUp)
+        this.Vis.BOARD_EL.addEventListener('touchend', fingerUp)
     }
 
     onClick(MOUSE_COORDS: number[]) {

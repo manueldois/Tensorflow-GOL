@@ -6,6 +6,7 @@
   "dependencies": {
     "@tensorflow/tfjs-core": "^1.2.8",
     "@types/async": "^3.0.1",
+    "extract-loader": "^3.1.0",
     "fast-png": "^4.0.1",
     "jquery": "^3.4.1",
     "panzoom": "^8.1.2",
@@ -13,8 +14,11 @@
   },
   "devDependencies": {
     "@types/jquery": "^3.3.31",
+    "copy-webpack-plugin": "^5.0.4",
     "css-loader": "^3.2.0",
+    "extract-text-webpack-plugin": "^3.0.2",
     "html-webpack-plugin": "^3.2.0",
+    "mini-css-extract-plugin": "^0.8.0",
     "node-sass": "^4.12.0",
     "sass-loader": "^7.2.0",
     "source-map-loader": "^0.2.4",
@@ -22,11 +26,13 @@
     "ts-loader": "^6.0.4",
     "typescript": "^3.5.3",
     "webpack": "^4.39.1",
-    "webpack-cli": "^3.3.6"
+    "webpack-cli": "^3.3.6",
+    "webpack-dev-server": "^3.8.0"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "echo 'To launch the app serve dist/index.html with a server' && webpack"
+    "start": "webpack-dev-server --mode development --host 0.0.0.0",
+    "build": "webpack --mode production"
   },
   "keywords": [],
   "author": "",

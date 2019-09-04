@@ -1,19 +1,26 @@
 import * as tf from '@tensorflow/tfjs-core'
-import { printVectors } from './util';
 
-/** Computes and mutates a GOL world using tensorflow
- * this.WORLD is a reference to the world used throught the app
+/** Computes the next iteration and mutates a GOL World Tensor using tensorflow
+ *  @description 
+ *  this.WORLD is a reference a 2D World Tensor Variable Shape [H, W] Dtype int32.
+ *  A zero is a dead cell. A value > zero is a living cell, and it represents the age of the cell.
  */
 export default class GOLCompute {
+    /** A reference to the world used throught the app */
     WORLD: tf.Variable<tf.Rank.R2> | null = null
-
     ITERATION = 0
+    
+    constructor(){}
 
+    /**
+     * Binds a World to this instance
+     * @param WORLD  The 2D World Tensor Variable Shape [H, W] Dtype int32
+     */
     useWorld(WORLD: tf.Variable<tf.Rank.R2>) {
         this.WORLD = WORLD
     }
 
-    /** Takes the WORLD Variable stored in the instance, compute the next GOL state, and assign
+    /** Takes the WORLD TF Variable stored in this instance, compute the next GOL state, and assign
      * the result back to the WORLD TF variable
      */
     nextState() {

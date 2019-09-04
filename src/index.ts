@@ -3,8 +3,6 @@ import * as tf from '@tensorflow/tfjs-core'
 import GOLVis from './GOLVis'
 import GOLCompute from './GOLCompute'
 import GOLApp from './GOLApp'
-import { printVectors, logger } from './util'
-import { IAppState } from './interfaces'
 import GOLDraw from './GOLDraw';
 
 const VIEWPORT_EL = document.getElementById('viewport')
@@ -13,7 +11,7 @@ const IMG_EL = document.getElementById('world')
 
 if (!VIEWPORT_EL || !BOARD_EL || !IMG_EL) throw "Can't find elements for GOLVis"
 
-tf.enableProdMode () 
+tf.enableProdMode() 
 
 const Compute = new GOLCompute()
 const Vis = new GOLVis(VIEWPORT_EL, BOARD_EL, <HTMLImageElement> IMG_EL)

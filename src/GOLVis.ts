@@ -1,11 +1,9 @@
-import { ISize, IVector, ITransform, IRect, IVisibleSquare } from './interfaces'
+import { ISize, IRect, IVisibleSquare } from './interfaces'
 import * as tf from '@tensorflow/tfjs-core'
+import * as rxjs from 'rxjs'
+import { Timeline, hexToRGB } from './util'
 import panzoom, { PanZoom } from 'panzoom'
 import { encode as PNGencoder } from 'fast-png'
-import { printVectors, logger, Timeline } from './util'
-import * as rxjs from 'rxjs'
-import GOLCompute from './GOLCompute';
-import { reject } from 'async';
 
 /** Provides rendering, panning, and zooming for GOL.
  * @param VIEWPORT_EL HTML Element where to render GOL. Any size.
@@ -35,11 +33,11 @@ export default class GOLVis {
         this.attachEventListeners()
     }
 
-    /** A ref to the WORLD Variable used thought the app */ 
+    /** A ref to the WORLD Variable used thought the app */
     WORLD: tf.Variable<tf.Rank.R2> | null = null
 
     WORLD_SIZE: number | null = null
-    
+
     /** Viewport height and width from DOM, in px.
      *  Changes on window resize
      */
@@ -65,6 +63,10 @@ export default class GOLVis {
 
     /** Stores the same scale as Panzoom */
     SCALE = 1
+
+    COLOR1 = hexToRGB('#FFFFFF')
+    COLOR2 = hexToRGB('#FF00FF')
+    FADING_SPEED = 2
 
     /** Binds an external WORLD variable this instance */
     useWorld(WORLD: tf.Variable<tf.Rank.R2>) {
@@ -207,6 +209,15 @@ export default class GOLVis {
         }
     }
 
+    setColors(color1?: (string | [number, number, number]), color2?: (string | [number, number, number])){
+        if(color1){
+            this.COLOR1 = typeof color1 === 'string' ? hexToRGB(color1) : color1
+        }
+        if(color2){
+            this.COLOR2 = typeof color2 === 'string' ? hexToRGB(color2) : color2
+        }
+    }
+
     /** Takes the WORLD Variable assigned in useWorld and renders it as a PNG in IMG_EL. 
      * @description
      * Slices and downsamples the WORLD to the current VIEWPORT, then
@@ -215,7 +226,7 @@ export default class GOLVis {
      * the image.
     */
     render(): Promise<void> {
-        const { WORLD, $IMG_LOAD, VISIBLE_SQUARE, IMG_EL } = this
+        const { WORLD, $IMG_LOAD, VISIBLE_SQUARE, IMG_EL, COLOR1, COLOR2, FADING_SPEED } = this
 
         return new Promise((resolve, reject) => {
             try {
@@ -250,10 +261,12 @@ export default class GOLVis {
                     timeline.mark('tensorToDataArray');
                 })
 
+                offsetImage(IMG_EL, VISIBLE_SQUARE, IMG_SCALE)
+
+
                 drawImage(IMG_EL, IMG_DATA, NEW_WIDTH, NEW_HEIGHT, $IMG_LOAD)
                     .then(() => {
                         timeline.mark('drawImage');
-                        offsetImage(IMG_EL, VISIBLE_SQUARE, IMG_SCALE)
                         timeline.mark('offsetImage');
                         timeline.end()
                         resolve()
@@ -302,10 +315,10 @@ export default class GOLVis {
                 function colorWorld(WORLD_3D: tf.Tensor<tf.Rank.R3>) {
                     const WORLD_3D_BOOL = WORLD_3D.toBool()
 
-                    const COLOR_A = tf.tensor1d([1, 0, 1]) // Shape [3]
-                    const COLOR_B = tf.tensor1d([1, 1, 1])
+                    const COLOR_A = tf.tensor1d(COLOR1).div(255) // Shape [3]
+                    const COLOR_B = tf.tensor1d(COLOR2).div(255)
 
-                    const COLOR_A_RATIO = smoothNormalize(WORLD_3D.sub(1), 3).mul(WORLD_3D_BOOL) //  Shape [H, W, 1] 
+                    const COLOR_A_RATIO = smoothNormalize(WORLD_3D.sub(1), 10 / FADING_SPEED).mul(WORLD_3D_BOOL) //  Shape [H, W, 1] 
                     const COLOR_B_RATIO = invertRatio(COLOR_A_RATIO).mul(WORLD_3D_BOOL)
 
                     const WORLD_RGB = <tf.Tensor<tf.Rank.R3>>tf.addN([
@@ -409,6 +422,7 @@ export default class GOLVis {
         })
 
     }
+    
 
 
 }
