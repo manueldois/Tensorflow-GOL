@@ -13,7 +13,7 @@ export default class GOLCompute {
         this.WORLD = WORLD
     }
 
-    /** Take the WORLD TF variable stored in the instance, compute the next GOL state, and assign
+    /** Takes the WORLD Variable stored in the instance, compute the next GOL state, and assign
      * the result back to the WORLD TF variable
      */
     nextState() {
@@ -36,7 +36,7 @@ export default class GOLCompute {
             const WORLD_BOOL = WORLD.toBool()
 
             // Tensorflow wants the input as 3D tensors of shape [batch, width, height, channel]
-            // We'v only one image to compute so batch is 1, and one channel (cell on or off)
+            // We'v only one image to compute so batch is 1, and one channel (cell age)
             const SHAPE3D: any = [WORLD_SIZE, WORLD_SIZE, 1]
             const WORLD3D_BOOL = <tf.Tensor<tf.Rank.R3>>WORLD_BOOL.reshape(SHAPE3D)
             const FILTER = <tf.Tensor<tf.Rank.R4>>tf.tensor(

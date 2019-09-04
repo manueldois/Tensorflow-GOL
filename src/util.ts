@@ -61,7 +61,7 @@ class Timeline {
     END_TIME: number | undefined
     RUN_DURATION: number | undefined
 
-    constructor(public NAME: string){
+    constructor(public NAME: string, public LOG_TO_CONSOLE_THRESHOLD?: number){
 
     }
 
@@ -75,7 +75,7 @@ class Timeline {
         this.RUN_DURATION = this.END_TIME - this.START_TIME
         this.TIMES.set('TOTAL', this.RUN_DURATION)
 
-        if(this.RUN_DURATION > 100){
+        if(this.LOG_TO_CONSOLE_THRESHOLD && this.RUN_DURATION > this.LOG_TO_CONSOLE_THRESHOLD){
             console.log(this.TIMES.entries())
         }
     }

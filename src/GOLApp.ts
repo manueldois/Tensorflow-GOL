@@ -123,13 +123,18 @@ export default class GOLApp {
             for (let i = 0; i < this.STATE.STEPS_PER_FRAME; i++) {
                 this.Compute.nextState()
             }
-            if(this.WORLD){
+            if (this.WORLD) {
                 await this.WORLD.data()
             }
             logger.log("Compute duration (ms)", Date.now() - time_start_compute)
         }
-        this.LOOPTIMER = setTimeout(() => this.loop(), 1000 / this.STATE.FRAMES_PER_SECOND)
+        const tf_memory = tf.memory()
+        logger.log("N Tensors in memory", tf_memory.numTensors)
+        logger.log("N Bytes in memory (kB)", tf_memory.numBytes / 1000)
+        console.log(tf_memory.numBytes)
+
         logger.printLogToConsole()
+        this.LOOPTIMER = setTimeout(() => this.loop(), 1000 / this.STATE.FRAMES_PER_SECOND)
     }
 
     start() {
@@ -152,6 +157,10 @@ export default class GOLApp {
             this.INITIAL_WORLD = <tf.Tensor<tf.Rank.R2>>tf.zeros([WORLD_SIZE, WORLD_SIZE], 'int32')
         }
 
+        if (this.WORLD) {
+            this.WORLD.dispose()
+        }
+
         this.WORLD = tf.variable(this.INITIAL_WORLD)
         this.Compute.useWorld(this.WORLD)
         this.Vis.useWorld(this.WORLD)
@@ -160,6 +169,8 @@ export default class GOLApp {
 
     randomizeWorld() {
         const { WORLD_SIZE, RUNNING } = this.STATE
+
+        if (this.INITIAL_WORLD) this.INITIAL_WORLD.dispose()
         this.INITIAL_WORLD = tf.randomUniform([WORLD_SIZE, WORLD_SIZE], -1, 2, 'int32')
 
         if (RUNNING) this.restart()
@@ -168,7 +179,7 @@ export default class GOLApp {
     clear() {
         const { WORLD_SIZE } = this.STATE
         if (this.WORLD) {
-            this.INITIAL_WORLD = tf.zeros([WORLD_SIZE, WORLD_SIZE], 'bool')
+            this.INITIAL_WORLD = tf.zeros([WORLD_SIZE, WORLD_SIZE], 'int32')
         }
         this.restart()
     }

@@ -8,17 +8,22 @@ import GOLCompute from './GOLCompute';
 import { reject } from 'async';
 
 /** Provides rendering, panning, and zooming for GOL.
+ * @param VIEWPORT_EL HTML Element where to render GOL. Any size.
+ * @param BOARD_EL 
+ * HTML Element where to render the GOL World. 
+ * Floats in VIEWPORT_EL with the panzoom library.
+ * BOARD in DOM is the same size in px as the world in cells.
+ * Its DOM size is set by this class.
+ * @param IMG_EL HTML Image where to render the GOL Cells. Ignores Cells out of view.
+ * 
  * @description
- * VIEWPORT contains BOARD contains IMG.
- * VIEWPORT can be any size in DOM. BOARD and IMG have their DOM size controlled by this class. 
- * BOARD floats in VIEWPORT, and has it's zoom and position controlled by panzoom.
+ * Viewport contains Board contains Img.
  * In the DOM, 1px = 1cell. Zooming is achieved by using the view layer (css tranform)
 */
 export default class GOLVis {
     constructor(public VIEWPORT_EL: HTMLElement,
         public BOARD_EL: HTMLElement,
         public IMG_EL: HTMLImageElement,
-        public Compute?: GOLCompute
     ) {
         if (!VIEWPORT_EL) throw new Error('Got no viewport element')
         if (!BOARD_EL) throw new Error('Got no board element')
@@ -30,34 +35,38 @@ export default class GOLVis {
         this.attachEventListeners()
     }
 
-    // A ref to the WORLD used thought the app
+    /** A ref to the WORLD Variable used thought the app */ 
     WORLD: tf.Variable<tf.Rank.R2> | null = null
-    WORLD_SIZE: number | null = null
-    // Viewport has just height and width from DOM, in px
-    // Changes on window resize
-    VIEWPORT: ISize = {} as ISize
-    // Board floats in Viewport using panzoom. Includes zoom. in px
-    // Changes on pan or zoom
-    BOARD: IRect = {} as IRect
-    // IMG is where the WORLD is rendered,
-    // It's offset from the board to make rendering only part of the grid possible
-    IMG: IRect = {} as IRect
-    IMG_LOAD_EVENT: rxjs.Observable<Event> | null = null
 
-    /** VISIBLE_SQUARE stores the coordenates of the part of the world that is visible by the user,
-     *  changes when BOARD or VIEWPORT change
+    WORLD_SIZE: number | null = null
+    
+    /** Viewport height and width from DOM, in px.
+     *  Changes on window resize
+     */
+    VIEWPORT: ISize = {} as ISize
+
+    /** Board position and size inside Viewport, in px.
+     *  Changes on pan or zoom
+     */
+    BOARD: IRect = {} as IRect
+
+    /** Observable from the onload event in the IMG_EL */
+    $IMG_LOAD: rxjs.Observable<Event> | undefined = undefined
+
+    /** Stores the rectangle bounding the Cells of the part of the world that is visible by the user.
+     *  Changes when BOARD or VIEWPORT change
     */
     VISIBLE_SQUARE: IVisibleSquare = {} as IVisibleSquare
 
     /** Panzoom instance. Panzoom is a library that provides pan and zoom to a DOM element.
-     *  here used to pan and zoom the BOARD
+     *  Here used to pan and zoom the BOARD
      */
     PANZOOM: PanZoom
 
     /** Stores the same scale as Panzoom */
     SCALE = 1
 
-    /** Binds a WORLD variable to the instance */
+    /** Binds an external WORLD variable this instance */
     useWorld(WORLD: tf.Variable<tf.Rank.R2>) {
         const WORLD_SIZE = WORLD.shape[0]
         if (WORLD_SIZE < 0) throw new Error('WORLD size must be greater than zero')
@@ -69,10 +78,11 @@ export default class GOLVis {
         this.centerView()
     }
 
+    /** Attach functions to react to window resize, image load, panzoom panend and panzoom zoom Events */
     attachEventListeners() {
         window.addEventListener('resize', () => { this.updateViewport() })
 
-        this.IMG_LOAD_EVENT = rxjs.fromEvent(this.IMG_EL, 'load')
+        this.$IMG_LOAD = rxjs.fromEvent(this.IMG_EL, 'load')
 
         this.PANZOOM.on('panend', (e: any) => {
             this.updateBoard()
@@ -86,6 +96,7 @@ export default class GOLVis {
 
     }
 
+    /** Gets the Viewport size from DOM and propagates changes downward */
     updateViewport() {
         this.VIEWPORT = {
             H: this.VIEWPORT_EL.getBoundingClientRect().height,
@@ -94,11 +105,14 @@ export default class GOLVis {
         this.updateBoard()
     }
 
+    /** Sets the DOM size of BOARD_EL according to WORLD.
+     * Gets the BOARD rendered position and size from PANZOOM
+     */
     updateBoard() {
         if (this.WORLD_SIZE !== null) {
+            this.BOARD_EL.style.width = this.BOARD_EL.style.height = `${this.WORLD_SIZE}px`
             const transform = this.PANZOOM.getTransform()
             // BOARD in DOM is the same size in px as the world in cells
-            this.BOARD_EL.style.width = this.BOARD_EL.style.height = `${this.WORLD_SIZE}px`
             this.BOARD = {
                 X: <number>transform.x, // 1px = 1cell
                 Y: <number>transform.y, // 1px = 1cell
@@ -109,12 +123,9 @@ export default class GOLVis {
         }
     }
 
+    /** Calculates and sets the VISIBLE_SQUARE */
     updateVisibleSquare() {
-        // Unpack vars
-        const BOARD = this.BOARD,
-            VIEWPORT = this.VIEWPORT,
-            SCALE = this.SCALE,
-            WORLD_SIZE = this.WORLD_SIZE
+        const { BOARD, VIEWPORT, SCALE, WORLD_SIZE } = this
 
         if (WORLD_SIZE !== null) {
             // These represent the square of the world that is visible by the user
@@ -186,6 +197,7 @@ export default class GOLVis {
         return
     }
 
+    /** Tells PANZOOM to move and zoom so as to have the BOARD centered in the VIEWPORT */
     centerView() {
         if (this.WORLD_SIZE !== null) {
             const NEW_SCALE = this.VIEWPORT.W / this.WORLD_SIZE * 0.7;
@@ -195,7 +207,7 @@ export default class GOLVis {
         }
     }
 
-    /** Takes the WORLD set in useWorld and renders it as a png in IMG_EL. 
+    /** Takes the WORLD Variable assigned in useWorld and renders it as a PNG in IMG_EL. 
      * @description
      * Slices and downsamples the WORLD to the current VIEWPORT, then
      * colors it, converts it to a base64 string, and assigns it to IMG_EL.src.
@@ -203,140 +215,149 @@ export default class GOLVis {
      * the image.
     */
     render(): Promise<void> {
-
-
-        /* fast-png can draw a maximum of 500 * 500 pixels.
-            To render a larger WORLD, first crop and downsample as needed.
-        */
-
-        const { WORLD, IMG_LOAD_EVENT, VISIBLE_SQUARE, IMG_EL, Compute } = this
-
-        if (!WORLD) {
-            throw new Error('No world to render')
-        }
+        const { WORLD, $IMG_LOAD, VISIBLE_SQUARE, IMG_EL } = this
 
         return new Promise((resolve, reject) => {
             try {
+                if (!WORLD) {
+                    throw new Error('No world to render')
+                }
+                if (VISIBLE_SQUARE.WIDTH <= 0 || VISIBLE_SQUARE.HEIGHT <= 0) {
+                    // Nothing is visible
+                    resolve()
+                    return
+                }
+
+                let timeline = new Timeline('Render', 1000)
+
                 let NEW_WIDTH, NEW_HEIGHT, IMG_SCALE, IMG_DATA
-                let timeline = new Timeline('Render')
-
-                // This is sync
+                // This is sync. Updates the vars above
                 tf.tidy('Render', () => {
+                    const WORLD_3D = <tf.Tensor<tf.Rank.R3>>WORLD.expandDims(2) // Shape [WORLS_SIZE, WORLD_SIZE, 1] 
 
-                    const CROP_RESULT = cropAndDownsampleWorld(WORLD, VISIBLE_SQUARE);
-                    // CROP_RESULT.WORLD3D.arraySync()
-                    timeline.mark('cutAndDownsample');
-
-                    ({ NEW_WIDTH, NEW_HEIGHT, IMG_SCALE } = CROP_RESULT); // We need this info outside the tidy scope
-
-                    const WORLD_COLORED = colorWorld(CROP_RESULT.WORLD3D)
-                    // WORLD_COLORED.arraySync()
+                    const WORLD_RGB = colorWorld(WORLD_3D)
                     timeline.mark('color');
 
-                    IMG_DATA = tensorToDataArray(WORLD_COLORED)
-                    timeline.mark('tensorToDataArray');
+                    const CROP_RESULT = cropAndResizeWorld(WORLD_RGB, VISIBLE_SQUARE)
+                    CROP_RESULT.WORLD_RGB_CROPPED_RESIZED.arraySync()
+                    timeline.mark('cutAndResize');
 
+                    NEW_HEIGHT = CROP_RESULT.WORLD_RGB_CROPPED_RESIZED.shape[0]
+                    NEW_WIDTH = CROP_RESULT.WORLD_RGB_CROPPED_RESIZED.shape[1]
+                    IMG_SCALE = CROP_RESULT.IMG_SCALE
+
+                    IMG_DATA = tensorToUInt8Array(CROP_RESULT.WORLD_RGB_CROPPED_RESIZED)
+                    timeline.mark('tensorToDataArray');
                 })
 
-                drawImage(IMG_DATA, NEW_WIDTH, NEW_HEIGHT, this.IMG_EL)
+                drawImage(IMG_EL, IMG_DATA, NEW_WIDTH, NEW_HEIGHT, $IMG_LOAD)
                     .then(() => {
                         timeline.mark('drawImage');
-                        offsetImage(VISIBLE_SQUARE, IMG_SCALE, this.IMG_EL)
+                        offsetImage(IMG_EL, VISIBLE_SQUARE, IMG_SCALE)
                         timeline.mark('offsetImage');
                         timeline.end()
                         resolve()
                     })
 
-                /** Crops and downsamples a 2D WORLD to its visible size.
-                 * Returns a 3D WORLD because it's useful to color in the next operation
-                 */
-                function cropAndDownsampleWorld(WORLD: tf.Tensor<tf.Rank.R2>, VISIBLE_SQUARE: IVisibleSquare) {
-                    // PNG encoder can draw a max of 500 * 500 px
-                    // Grid can be much larger
-                    // Cut and resize, then downscale using tensorflow
+
+                /** Crops and downsamples a 3D RGB World to its visible size.
+                 *  @param WORLD_RGB Tensor Shape [H, W, 3]
+                 *  @param VISIBLE_SQUARE The square to cut by
+                 *  @returns WORLD_RGB_CROPPED_RESIZED: Tensor Shape [H, W, 3]
+                 *  @returns IMG_SCALE: number The ratio between the old and the resized World size 
+                */
+                function cropAndResizeWorld(WORLD_RGB: tf.Tensor<tf.Rank.R3>, VISIBLE_SQUARE: IVisibleSquare) {
+                    const WORLD_HEIGHT = WORLD_RGB.shape[0] // H
+                    const WORLD_WIDTH = WORLD_RGB.shape[1] // W
 
                     const { TOP, LEFT, BOTTOM, RIGHT, WIDTH, HEIGHT } = VISIBLE_SQUARE
 
-                    // If size > 500 * 500 px, IMG_SCALE = 0.5, if > 500 * 500 * 2 px, 0.25 etc
-                    const IMG_SCALE = 1 / Math.ceil(Math.sqrt((WIDTH * HEIGHT) / (500 * 500)))
+                    const IMG_SCALE = 1 / Math.ceil(Math.sqrt((WIDTH * HEIGHT) / (500 * 500))) // 1, 1/2, 1/4...
 
                     const NEW_WIDTH = Math.ceil(WIDTH * IMG_SCALE),
                         NEW_HEIGHT = Math.ceil(HEIGHT * IMG_SCALE)
 
-                    const WORLD3D_CROPPED_RESIZED =
-                        (<tf.Tensor<tf.Rank.R3>>WORLD.slice([TOP, LEFT], [HEIGHT, WIDTH])
-                            .expandDims(2)
-                        )
-                            .resizeNearestNeighbor([NEW_HEIGHT, NEW_WIDTH])
+                    const WORLD_4D = <tf.Tensor<tf.Rank.R4>>
+                        WORLD_RGB
+                            .toFloat()
+                            .reshape([1, WORLD_RGB.shape[0], WORLD_RGB.shape[1], 3]) // Shape [1,H, W, 3]
 
-                    // printVectors({ WORLD3D_CROPPED_RESIZED })
+                    const BOXES = tf.tensor2d(
+                        [
+                            [TOP / WORLD_HEIGHT, LEFT / WORLD_WIDTH, BOTTOM / WORLD_HEIGHT, RIGHT / WORLD_WIDTH]
+                        ]
+                    )
+                    const WORLD_RGB_CROPPED_RESIZED = <tf.Tensor<tf.Rank.R3>>
+                        tf.image.cropAndResize(WORLD_4D, BOXES, [0], [NEW_HEIGHT, NEW_WIDTH], 'nearest')
+                            .squeeze([0])
 
-                    return { WORLD3D: WORLD3D_CROPPED_RESIZED, NEW_WIDTH, NEW_HEIGHT, IMG_SCALE }
-
+                    return { WORLD_RGB_CROPPED_RESIZED, IMG_SCALE }
                 }
 
-                function colorWorld(WORLD3D: tf.Tensor<tf.Rank.R3>) {
-                    if (false) {
+                /**
+                 * Takes a 3D Age World and colors it
+                 * @param WORLD_3D The World to render, optionaly with cell ages Shape [H, W, 1]
+                 * @returns The colored 3D RGB World Shape [H, W, 3]
+                 */
+                function colorWorld(WORLD_3D: tf.Tensor<tf.Rank.R3>) {
+                    const WORLD_3D_BOOL = WORLD_3D.toBool()
 
-                        const WORLD3D_BOOL = WORLD3D.toBool()
+                    const COLOR_A = tf.tensor1d([1, 0, 1]) // Shape [3]
+                    const COLOR_B = tf.tensor1d([1, 1, 1])
 
-                        /** Scalar smoothing function: f(X), X: [0, +inf], f(X): [0, 1].
-                         * @description
-                         * Variable smoothing factor A: [0, +inf].
-                         * f(X) = (1 + A)/(X + 1 + A).
-                         * f(0) = 1, f(+inf) = 0.
-                         * Bigger A = Slower fall to zero (smaller derivative).
-                         * A = 0: f(1) = 1/2, f(2) = 1/3 ...
-                         * A = 1: f(1) = 1/3, f(2) = 1/4 ... 
-                        */
-                        function smoothTensor(X: tf.Tensor<tf.Rank>, A: number = 0) {
-                            // f(X) = (1 + A)/(X + 1 + A)
-                            // f(X) = 1/(X + 1 + A) * (1 + A)
-                            return X
-                                .clipByValue(0, Infinity) // Assert X >= 0 
-                                .add(1 + A) // (X + 1 + A)
-                                .reciprocal() // 1/(X + 1 + A)
-                                .mul(1 + A) // 1/(X + 1 + A) * (1 + A) = f(X)
-                        }
+                    const COLOR_A_RATIO = smoothNormalize(WORLD_3D.sub(1), 3).mul(WORLD_3D_BOOL) //  Shape [H, W, 1] 
+                    const COLOR_B_RATIO = invertRatio(COLOR_A_RATIO).mul(WORLD_3D_BOOL)
 
-                        /** For a Tensor X representing a ratio [0, 1], calculate 1 - X */
-                        function invertTensor(X: tf.Tensor<tf.Rank>) {
-                            return X.neg().add(1)
-                        }
+                    const WORLD_RGB = <tf.Tensor<tf.Rank.R3>>tf.addN([
+                        COLOR_A.mul(COLOR_A_RATIO), //  Shape [H, W, 3] 
+                        COLOR_B.mul(COLOR_B_RATIO)
+                    ]).mul(255)
 
-                        const COLOR_A = tf.tensor([1, 0, 1])
-                        const COLOR_B = tf.tensor([1, 1, 1])
+                    return WORLD_RGB //  Shape [H, W, 3]
 
-                        const COLOR_A_RATIO = smoothTensor(WORLD3D.sub(1), 3).mul(WORLD3D_BOOL)
-                        const COLOR_B_RATIO = invertTensor(COLOR_A_RATIO).mul(WORLD3D_BOOL)
 
+                    /** Scalar smoothing function
+                     * @param X The Tensor to normalize any shape values [0 to +inf]
+                     * @param A Smoothing factor [0 to +inf].
+                     * @returns Tensor with values [0 to 1]
+                     * @description
+                     * f(X) = (1 + A)/(X + 1 + A).
+                     * Bigger A -> Slower fall to zero.
+                    */
+                    function smoothNormalize(X: tf.Tensor<tf.Rank>, A: number = 0) {
+                        // f(X) = (1 + A)/(X + 1 + A)
+                        // f(X) = 1/(X + 1 + A) * (1 + A)
+                        return X
+                            .clipByValue(0, Infinity) // Assert X >= 0 
+                            .add(1 + A)
+                            .reciprocal()
+                            .mul(1 + A)
                     }
 
-
-
-                    if (Compute && false) {
-                        // const COLOR_COMB = tf.addN([
-                        //     COLOR_A.mul(COLOR_A_RATIO),
-                        //     COLOR_B.mul(COLOR_B_RATIO)
-                        // ])
-
-                        // const WORLD_COLOR = COLOR_COMB.mul(255).toInt()
-                        // return WORLD_COLOR
-
-                    } else {
-                        return WORLD3D.toBool()
-                            .tile([1, 1, 3]) // From 1 channel [L] to 3 channel [R,G,B]
-                            .mul(255) // Just paint white
+                    /** For a Tensor X representing a ratio [0, 1], calculate 1 - X */
+                    function invertRatio(X: tf.Tensor<tf.Rank>) {
+                        return X.neg().add(1)
                     }
+
                 }
 
-                function tensorToDataArray(WORLD: tf.Tensor<tf.Rank>) {
-                    return new Uint8Array(WORLD.bufferSync().values)
+                /** Convert a Tensor to a Uint8Array. Sync  */
+                function tensorToUInt8Array(TENSOR: tf.Tensor<tf.Rank>) {
+                    return new Uint8Array(TENSOR.bufferSync().values)
                 }
 
-                function drawImage(DATA_ARRAY, WIDTH, HEIGHT, IMG_EL: HTMLImageElement) {
+                /**
+                 * Draws a PNG image in IMG_EL with the pixels from DATA_ARRAY.
+                 * The image is passed as a base64 encoded string in IMG_EL.src
+                 * @param IMG_EL The DOM Element where to render
+                 * @param DATA_ARRAY A Uint8Array with a sequence of RGB values
+                 * @param WIDTH The width of the image
+                 * @param HEIGHT The height of the image 
+                 * @param $IMG_LOAD An observable that emits whenever the IMG_EL loads
+                 * @returns Promise. Waits for IMG_LOAD_EVENT if it exists, otherwise resolves immidiatly
+                 */
+                function drawImage(IMG_EL: HTMLImageElement, DATA_ARRAY: Uint8Array, WIDTH: number, HEIGHT: number, $IMG_LOAD?: rxjs.Observable<Event>) {
                     return new Promise((resolve, reject) => {
-
                         // Function encode from fast-png 
                         const encoded = PNGencoder({
                             width: WIDTH,
@@ -345,12 +366,22 @@ export default class GOLVis {
                             channels: 3
                         })
 
-                        const b64 = btoa(String.fromCharCode(...encoded))
+                        function arrayBufferToBase64(buffer) {
+                            let binary = '';
+                            let bytes = new Uint8Array(buffer);
+                            let len = bytes.byteLength;
+                            for (let i = 0; i < len; i++) {
+                                binary += String.fromCharCode(bytes[i]);
+                            }
+                            return window.btoa(binary);
+                        }
+
+                        const b64 = arrayBufferToBase64(encoded.buffer)
                         IMG_EL.src = `data:image/png;base64,${b64}`
 
                         // If we are watching the image onload event wait for it
-                        if (IMG_LOAD_EVENT) {
-                            IMG_LOAD_EVENT.subscribe(() => resolve())
+                        if ($IMG_LOAD) {
+                            $IMG_LOAD.subscribe(() => resolve())
                         } else {
                             resolve()
                         }
@@ -358,7 +389,13 @@ export default class GOLVis {
                     })
                 }
 
-                function offsetImage(VISIBLE_SQUARE, IMG_SCALE, IMG_EL) {
+                /**
+                 * Offset an image in the DOM so it stays fixed after it has been cut and resized
+                 * @param IMG_EL The DOM Element where to render
+                 * @param VISIBLE_SQUARE The square by which the image was cut
+                 * @param IMG_SCALE The scale by which the image downsampled 
+                 */
+                function offsetImage(IMG_EL: HTMLImageElement, VISIBLE_SQUARE: IVisibleSquare, IMG_SCALE: number) {
                     // If we are cutting the world from LEFT or TOP, the image in the DOM will be smaller and shift up or left
                     // To adjust, translate the image relative to BOARD, and scale to compensate for downsampling
                     const { TOP, LEFT, WIDTH, HEIGHT } = VISIBLE_SQUARE

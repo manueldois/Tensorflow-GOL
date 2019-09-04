@@ -13,31 +13,12 @@ const IMG_EL = document.getElementById('world')
 
 if (!VIEWPORT_EL || !BOARD_EL || !IMG_EL) throw "Can't find elements for GOLVis"
 
+tf.enableProdMode () 
+
 const Compute = new GOLCompute()
-const Vis = new GOLVis(VIEWPORT_EL, BOARD_EL, <HTMLImageElement> IMG_EL, Compute)
+const Vis = new GOLVis(VIEWPORT_EL, BOARD_EL, <HTMLImageElement> IMG_EL)
 const Draw = new GOLDraw(Vis)
 const App = new GOLApp(Compute, Vis, Draw)
 
 App.start()
 App.randomizeWorld()
-
-// let WORLD = tf.variable(
-//     tf.tensor2d([
-//         [1, 1, 0],
-//         [0, 1, 2],
-//         [0, 0, 0]
-//     ], undefined, 'int32'
-//     ))
-
-// printVectors({ WORLD })
-// Compute.useWorld(WORLD)
-// console.log('----- NEXT -----')
-// Compute.nextState()
-// printVectors({ WORLD })
-// console.log('----- NEXT -----')
-// Compute.nextState()
-// printVectors({ WORLD })
-// console.log('----- NEXT -----')
-// Compute.nextState()
-// printVectors({ WORLD })
-
