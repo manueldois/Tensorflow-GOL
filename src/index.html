@@ -14,7 +14,7 @@
     <section id="viewport">
       <div id="board">
         <img id="world" draggable="false">
-        <canvas></canvas>
+        <canvas id="tf-canvas"></canvas>
       </div>
     </section>
 
@@ -53,9 +53,9 @@
         </label>
 
 
-        <button type="button" data-action="restart"> <span>Restart</span></button>
-        <button type="button" data-action="randomizeWorld"> <span>Randomize World</span></button>
-        <button type="button" data-action="clear"> <span>Clear</span></button>
+        <button type="button" id="IN_restart" data-action="restart"> <span>Restart</span></button>
+        <button type="button" id="IN_randomize" data-action="randomizeWorld"> <span>Randomize World</span></button>
+        <button type="button" id="IN_clear" data-action="clear"> <span>Clear</span></button>
         
         <button type="button" data-action="next"> <span>Next</span></button>
 

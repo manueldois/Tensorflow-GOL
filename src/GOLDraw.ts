@@ -68,7 +68,6 @@ export default class GOLDraw {
             const BUFFER = this.WORLD.bufferSync();
             const CELL = BUFFER.get(...CELL_COORDS);
             CELL ? BUFFER.set(0, ...CELL_COORDS) : BUFFER.set(1, ...CELL_COORDS);
-            this.Vis.render();
         }
     }
 }

@@ -17,6 +17,10 @@ export default class GOLCompute {
      * @param WORLD  The 2D World Tensor Variable Shape [H, W] Dtype int32
      */
     useWorld(WORLD: tf.Variable<tf.Rank.R2>) {
+        const WORLD_SIZE = WORLD.shape[0]
+        if (WORLD_SIZE < 0) throw new Error('WORLD_SIZE must be greater than zero')
+        if (WORLD_SIZE % 1 !== 0) throw new Error('WORLD_SIZE must be an integer')
+        
         this.WORLD = WORLD
     }
 

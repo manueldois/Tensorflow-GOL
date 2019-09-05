@@ -167,7 +167,7 @@ section#viewport {
   > div#board {
     outline: 1px solid red;
 
-    > img#world {
+    > img#world, canvas#tf-canvas {
       // outline: 1px solid green;
       position: absolute;
       transform-origin: 0% 0%;
