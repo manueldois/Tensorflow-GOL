@@ -101,7 +101,7 @@ export default class GOLApp {
 
     setupWorld() {
         if (!this.INITIAL_WORLD) {
-                this.INITIAL_WORLD = tf.zeros([this.STATE.WORLD_SIZE, this.STATE.WORLD_SIZE], 'int32')
+            this.INITIAL_WORLD = tf.zeros([this.STATE.WORLD_SIZE, this.STATE.WORLD_SIZE], 'int32')
         }
 
         if (this.WORLD) this.WORLD.dispose()
@@ -233,7 +233,7 @@ export default class GOLApp {
     onWorldSize(value: number) {
         this.STATE.WORLD_SIZE = Math.round(value)
         this.updateUI()
-        this.setupWorld()
+        this.randomizeWorld()
     }
 
     onStepsPerFrame(value: number) {
