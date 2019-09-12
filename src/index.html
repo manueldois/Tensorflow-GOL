@@ -53,11 +53,12 @@
         </label>
 
 
-        <button type="button" id="IN_restart" data-action="restart"> <span>Restart</span></button>
-        <button type="button" id="IN_randomize" data-action="randomizeWorld"> <span>Randomize World</span></button>
-        <button type="button" id="IN_clear" data-action="clear"> <span>Clear</span></button>
+        <button type="button" id="IN_save" data-action="onSave"> <span>Save</span></button>        
+        <button type="button" id="IN_load" data-action="onLoad"> <span>Load</span></button>
+        <button type="button" id="IN_randomize"> <span>Randomize World</span></button>
+        <button type="button" id="IN_clear" data-action="onClear"> <span>Clear</span></button>
         
-        <button type="button" data-action="next"> <span>Next</span></button>
+        <button type="button" data-action="onNext"> <span>Next</span></button>
 
         <label for="IN_pause">
           <input type="checkbox" id="IN_pause" data-action="onPause" data-value="PAUSED">

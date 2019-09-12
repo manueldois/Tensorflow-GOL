@@ -32,40 +32,6 @@ section#controls {
   section#controls label > span {
     color: white; }
 
-div.buttons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-bottom: 6px;
-  margin-top: 6px; }
-  div.buttons > label,
-  div.buttons button,
-  div.buttons input {
-    margin-left: 15px;
-    margin-bottom: 10px; }
-    div.buttons > label:first-child,
-    div.buttons button:first-child,
-    div.buttons input:first-child {
-      margin-left: 0; }
-    div.buttons > label:last-child,
-    div.buttons button:last-child,
-    div.buttons input:last-child {
-      margin-right: 15px; }
-
-div.sliders > label {
-  display: inline-block;
-  width: 350px;
-  padding: 10px; }
-  div.sliders > label > input {
-    width: 100%; }
-
-@media screen and (max-width: 800px) {
-  div.sliders {
-    width: 100%; }
-  div.sliders > label {
-    display: block;
-    width: 100%; } }
-
 section#console {
   position: fixed;
   top: 0;
@@ -75,10 +41,10 @@ section#console {
   width: 100%; }
   section#console > input#IN_expand-console {
     display: none; }
-  section#console input#IN_expand-console:checked ~ label[for="IN_expand-console"] > img {
-    transform: rotate(180deg); }
-  section#console input#IN_expand-console:checked ~ div.log {
-    display: block; }
+    section#console > input#IN_expand-console:checked ~ label[for="IN_expand-console"] > img {
+      transform: rotate(180deg); }
+    section#console > input#IN_expand-console:checked ~ div.log {
+      display: block; }
   section#console > label[for="IN_expand-console"] {
     position: absolute;
     bottom: -10px;
@@ -119,9 +85,42 @@ section#viewport {
   background-color: #323232; }
   section#viewport > div#board {
     outline: 1px solid red; }
-    section#viewport > div#board > img#world {
+    section#viewport > div#board > img#world, section#viewport > div#board canvas#tf-canvas {
       position: absolute;
       transform-origin: 0% 0%;
       image-rendering: pixelated;
       image-rendering: crisp-edges; }
+
+div.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 6px; }
+  div.buttons > label,
+  div.buttons button,
+  div.buttons input {
+    margin-left: 15px;
+    margin-bottom: 6px; }
+    div.buttons > label:first-child,
+    div.buttons button:first-child,
+    div.buttons input:first-child {
+      margin-left: 0; }
+    div.buttons > label:last-child,
+    div.buttons button:last-child,
+    div.buttons input:last-child {
+      margin-right: 15px; }
+
+div.sliders > label {
+  display: inline-block;
+  width: 350px;
+  padding: 10px; }
+  div.sliders > label > input {
+    width: 100%; }
+
+@media screen and (max-width: 800px) {
+  div.sliders {
+    width: 100%; }
+  div.sliders > label {
+    display: block;
+    width: 100%; } }
 

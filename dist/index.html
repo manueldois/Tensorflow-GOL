@@ -14,6 +14,7 @@
     <section id="viewport">
       <div id="board">
         <img id="world" draggable="false">
+        <canvas id="tf-canvas"></canvas>
       </div>
     </section>
 
@@ -35,14 +36,11 @@
         <label>
           World Size:
           <select name="worldsize" data-action="onWorldSize" data-value="WORLD_SIZE">
-            <option value="10">10 * 10</option>
             <option value="100">100 * 100</option>
             <option value="200">200 * 200</option>
             <option value="500">500 * 500</option>
             <option value="1000">1000 * 1000</option>
             <option value="2000">2000 * 2000</option>
-            <option value="3000">3000 * 3000</option>
-            <option value="4000">4000 * 4000</option>
           </select>
         </label>
 
@@ -55,21 +53,28 @@
         </label>
 
 
-        <button type="button" data-action="next"> <span>Next</span></button>
-        <button type="button" data-action="restart"> <span>Restart</span></button>
-        <button type="button" data-action="randomizeWorld"> <span>Randomize World</span></button>
-        <button type="button" data-action="clear"> <span>Clear</span></button>
+        <button type="button" id="IN_save" data-action="onSave"> <span>Save</span></button>        
+        <button type="button" id="IN_load" data-action="onLoad"> <span>Load</span></button>
+        <button type="button" id="IN_randomize"> <span>Randomize World</span></button>
+        <button type="button" id="IN_clear" data-action="onClear"> <span>Clear</span></button>
+        
+        <button type="button" data-action="onNext"> <span>Next</span></button>
 
         <label for="IN_pause">
           <input type="checkbox" id="IN_pause" data-action="onPause" data-value="PAUSED">
           <span>Pause</span>
+        </label>
+
+        <label for="IN_color">
+          <input type="color" id="IN_color" data-action="onColor" data-value="COLOR1">
+          <span>Color</span>
         </label>
       </div>
 
 
       <div class="sliders">
         <label class="above">
-          Frames per second: <span class="value" data-value="FRAMES_PER_SECOND"></span>
+          Speed: <span class="value" data-value="FRAMES_PER_SECOND"></span>
           <input type="range" data-action="onFPS" data-value="FRAMES_PER_SECOND" min="0" max="30" step="1">
         </label>
 

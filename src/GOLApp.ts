@@ -15,7 +15,7 @@ import { delayWhen } from 'rxjs/operators'
  */
 export default class GOLApp {
     STATE = {
-        WORLD_SIZE: 1000,
+        WORLD_SIZE: 200,
         FRAMES_PER_SECOND: 20,
         STEPS_PER_FRAME: 1,
         RUNNING: true,
@@ -29,6 +29,10 @@ export default class GOLApp {
     */
     WORLD: tf.Variable<tf.Rank.R2> | null = null
 
+    INITIAL_WORLD: tf.Tensor<tf.Rank.R2> | null = null
+
+    SAVED_WORLD: tf.Tensor<tf.Rank.R2> | null = null
+
     LAST_ITER_TIME = Date.now()
     LAST_ITER_DONE = true
     LAST_ITER_COMPLETED = new Subject()
@@ -38,7 +42,6 @@ export default class GOLApp {
     /** List of HTMLElements that are marked as a binding variable in the HTML template */
     BINDINGS = document.querySelectorAll('[data-value]')
 
-    INITIAL_WORLD: tf.Tensor<tf.Rank.R2> | null = null
 
     $RANDOMIZE_WORLD = fromEvent(<HTMLElement
         >document.getElementById('IN_randomize'),
@@ -49,40 +52,35 @@ export default class GOLApp {
         this.updateUI()
         this.setBackend(this.STATE.BACKEND)
         this.setupWorld()
+        this.randomizeWorld()
         this.Vis.setColors('', this.STATE.COLOR1)
-
-        this.$RANDOMIZE_WORLD.pipe(
-            delayWhen(() => this.LAST_ITER_COMPLETED)
-        )
-            .subscribe(() => {
-                console.log('randomize')
-                if(this.INITIAL_WORLD) this.INITIAL_WORLD.dispose()
-                this.INITIAL_WORLD = tf.randomUniform([this.STATE.WORLD_SIZE, this.STATE.WORLD_SIZE],0,2,'int32')
-                this.setupWorld()
-            })
+        this.Vis.centerView()
     }
 
     start() {
         setInterval(() => {
-            if (this.LAST_ITER_DONE && !this.STATE.PAUSED
-                 && this.STATE.RUNNING
-                 && Date.now() - this.LAST_ITER_TIME > 1000 / this.STATE.FRAMES_PER_SECOND) {
+            if (this.LAST_ITER_DONE
+                && this.STATE.RUNNING
+                && Date.now() - this.LAST_ITER_TIME > 1000 / this.STATE.FRAMES_PER_SECOND) {
                 this.next()
             }
         })
     }
 
     async next() {
-        if(!this.WORLD) return
+        if (!this.WORLD) return
         const TIMELINE = new Timeline('next')
         this.LAST_ITER_DONE = false
 
         await this.Vis.renderWithTF()
         TIMELINE.mark('Render')
 
-        for(let i = 0; i < this.STATE.STEPS_PER_FRAME; i++){
-            await this.Compute.nextState()
+        if (!this.STATE.PAUSED) {
+            for (let i = 0; i < this.STATE.STEPS_PER_FRAME; i++) {
+                await this.Compute.nextState()
+            }
         }
+
         TIMELINE.mark('Compute')
         TIMELINE.end()
 
@@ -103,7 +101,7 @@ export default class GOLApp {
 
     setupWorld() {
         if (!this.INITIAL_WORLD) {
-            this.INITIAL_WORLD = tf.zeros([this.STATE.WORLD_SIZE, this.STATE.WORLD_SIZE], 'int32')
+                this.INITIAL_WORLD = tf.zeros([this.STATE.WORLD_SIZE, this.STATE.WORLD_SIZE], 'int32')
         }
 
         if (this.WORLD) this.WORLD.dispose()
@@ -112,6 +110,12 @@ export default class GOLApp {
         this.Compute.useWorld(this.WORLD)
         this.Vis.useWorld(this.WORLD)
         if (this.Draw) this.Draw.useWorld(this.WORLD)
+    }
+
+    randomizeWorld() {
+        if (this.INITIAL_WORLD) this.INITIAL_WORLD.dispose()
+        this.INITIAL_WORLD = <tf.Tensor<tf.Rank.R2>>tf.randomUniform([this.STATE.WORLD_SIZE, this.STATE.WORLD_SIZE], -1, 2, 'int32').greater(0).toInt()
+        this.setupWorld()
     }
 
     attachControls() {
@@ -159,9 +163,14 @@ export default class GOLApp {
                 default:
                     break;
             }
-
-
         })
+
+        this.$RANDOMIZE_WORLD.pipe(
+            delayWhen(() => this.LAST_ITER_COMPLETED)
+        )
+            .subscribe(() => {
+                this.randomizeWorld()
+            })
     }
 
     updateUI() {
@@ -224,10 +233,35 @@ export default class GOLApp {
     onWorldSize(value: number) {
         this.STATE.WORLD_SIZE = Math.round(value)
         this.updateUI()
+        this.setupWorld()
     }
 
     onStepsPerFrame(value: number) {
         this.STATE.STEPS_PER_FRAME = value
         this.updateUI()
+    }
+
+
+
+    onClear() {
+        if (this.INITIAL_WORLD) this.INITIAL_WORLD.dispose()
+        this.INITIAL_WORLD = tf.zeros([this.STATE.WORLD_SIZE, this.STATE.WORLD_SIZE], 'int32')
+        this.setupWorld()
+    }
+
+    onNext() {
+        this.Compute.nextState()
+    }
+
+    onSave(){
+        console.log('on save')
+        if(this.WORLD){
+            this.SAVED_WORLD = <tf.Tensor<tf.Rank.R2>> tf.tensor(this.WORLD.arraySync()).toInt()
+        }
+    }
+
+    onLoad() {
+        this.INITIAL_WORLD = this.SAVED_WORLD
+        this.setupWorld()
     }
 }

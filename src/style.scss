@@ -42,51 +42,6 @@ section#controls {
   }
 }
 
-div.buttons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-bottom: 6px;
-  margin-top: 6px;
-
-  > label,
-  button,
-  input {
-    margin-left: 15px;
-    margin-bottom: 10px;
-
-    &:first-child {
-      margin-left: 0;
-    }
-
-    &:last-child {
-      margin-right: 15px;
-    }
-  }
-}
-
-div.sliders {
-  > label {
-    display: inline-block;
-    width: 350px;
-    padding: 10px;
-
-    > input {
-      width: 100%;
-    }
-  }
-
-  @media screen and (max-width: 800px) {
-    & {
-      width: 100%;
-    }
-    > label {
-      display: block;
-      width: 100%;
-    }
-  }
-}
-
 section#console {
   position: fixed;
   top: 0;
@@ -173,6 +128,50 @@ section#viewport {
       transform-origin: 0% 0%;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
+    }
+  }
+}
+
+div.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 6px;
+
+  > label,
+  button,
+  input {
+    margin-left: 15px;
+    margin-bottom: 6px;
+
+    &:first-child {
+      margin-left: 0;
+    }
+
+    &:last-child {
+      margin-right: 15px;
+    }
+  }
+}
+
+div.sliders {
+  > label {
+    display: inline-block;
+    width: 350px;
+    padding: 10px;
+
+    > input {
+      width: 100%;
+    }
+  }
+
+  @media screen and (max-width: 800px) {
+    & {
+      width: 100%;
+    }
+    > label {
+      display: block;
+      width: 100%;
     }
   }
 }

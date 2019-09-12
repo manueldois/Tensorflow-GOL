@@ -27,7 +27,7 @@ export default class GOLVis {
         if (!BOARD_EL) throw new Error('Got no board element')
         if (!CANVAS_EL) throw new Error('Got no image element')
 
-        this.PANZOOM = panzoom(this.BOARD_EL)
+        this.PANZOOM = panzoom(this.BOARD_EL, {smoothScroll: false})
 
         this.updateViewport()
         this.attachEventListeners()
@@ -75,7 +75,6 @@ export default class GOLVis {
         this.WORLD = WORLD
         
         this.updateBoard()
-        this.centerView()
     }
 
     /** Attach functions to react to window resize, image load, panzoom panend and panzoom zoom Events */
@@ -202,6 +201,8 @@ export default class GOLVis {
             this.PANZOOM.zoomAbs(0, 0, NEW_SCALE);
             this.PANZOOM.moveTo((this.VIEWPORT.W - this.WORLD_SIZE * NEW_SCALE) / 2, (this.VIEWPORT.H - this.WORLD_SIZE * NEW_SCALE) / 2);
             this.SCALE = NEW_SCALE;
+
+            this.updateBoard()
         }
     }
 
