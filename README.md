@@ -1,7 +1,7 @@
 # TensorflowGOL
 Conway's Game of Life on the browser with WebGL support using Tensorflow core
 
-Live at https://manueldois.github.io/TensorflowGOL/
+Live at https://manueldois.github.io/Tensorflow-GOL/
 
 This algorithm uses 2D Tensor of all cell spaces (fixed world size) and a convolution to count the number of neighbors.
 
